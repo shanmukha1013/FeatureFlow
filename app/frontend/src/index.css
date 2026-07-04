@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#0a0a0a] text-[#ededed] antialiased;
+  }
+}
+
+.glass {
+  @apply bg-[#171717] border border-[#262626] shadow-sm;
+}
