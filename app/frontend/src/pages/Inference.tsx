@@ -9,6 +9,7 @@ export const Inference = () => {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [history, setHistory] = useState<any[]>([]);
 
   const handlePredict = async () => {
     setLoading(true);
@@ -21,6 +22,7 @@ export const Inference = () => {
         features: parsedFeatures
       });
       setResult(res.data);
+      setHistory(prev => [res.data, ...prev].slice(0, 5)); // Keep last 5
     } catch (e: any) {
       setError(e.response?.data?.error?.message || e.message);
     } finally {
@@ -29,7 +31,7 @@ export const Inference = () => {
   };
 
   return (
-    <div className="max-w-5xl space-y-6 animate-in fade-in">
+    <div className="max-w-5xl space-y-6 animate-in fade-in pb-12">
       <PageHeader title="Inference Playground" subtitle="Manually test live predictions against registered model aliases." />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -92,8 +94,17 @@ export const Inference = () => {
                   <div className="text-3xl font-semibold text-white mt-2 tracking-tight">{String(result.prediction)}</div>
                 </div>
                 <div className="bg-[#0a0a0a] border border-border rounded-md p-4">
+                  <div className="text-xs text-muted uppercase tracking-wide">Confidence</div>
+                  <div className="text-3xl font-semibold text-white mt-2 tracking-tight">{result.confidence ? (result.confidence * 100).toFixed(1) + '%' : 'N/A'}</div>
+                </div>
+                <div className="bg-[#0a0a0a] border border-border rounded-md p-4">
                   <div className="text-xs text-muted uppercase tracking-wide">Latency</div>
                   <div className="text-3xl font-semibold text-white mt-2 tracking-tight">{result.latency_ms.toFixed(2)} ms</div>
+                </div>
+                <div className="bg-[#0a0a0a] border border-border rounded-md p-4">
+                  <div className="text-xs text-muted uppercase tracking-wide">Model Version</div>
+                  <div className="text-sm font-semibold text-white mt-2 tracking-tight break-all">{result.model_version}</div>
+                  <div className="text-xs text-muted mt-1 break-all">{result.model_name}</div>
                 </div>
               </div>
               
@@ -112,6 +123,36 @@ export const Inference = () => {
           )}
         </div>
       </div>
+
+      {history.length > 0 && (
+        <div className="bg-surface border border-border rounded-lg p-6 space-y-4 mt-6">
+          <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Prediction History</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border/50 text-xs uppercase text-muted">
+                  <th className="py-3 px-4 font-medium">Timestamp</th>
+                  <th className="py-3 px-4 font-medium">Model</th>
+                  <th className="py-3 px-4 font-medium">Prediction</th>
+                  <th className="py-3 px-4 font-medium">Confidence</th>
+                  <th className="py-3 px-4 font-medium text-right">Latency</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {history.map((h, i) => (
+                  <tr key={i} className="border-b border-border/50 hover:bg-white/5 transition-colors">
+                    <td className="py-3 px-4 text-muted">{new Date(h.timestamp).toLocaleTimeString()}</td>
+                    <td className="py-3 px-4"><span className="font-mono text-xs">{h.model_name.substring(0, 16)}...</span></td>
+                    <td className="py-3 px-4 text-white font-medium">{String(h.prediction)}</td>
+                    <td className="py-3 px-4 text-muted">{h.confidence ? (h.confidence * 100).toFixed(1) + '%' : '-'}</td>
+                    <td className="py-3 px-4 text-right text-muted">{h.latency_ms.toFixed(2)} ms</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

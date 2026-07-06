@@ -1,11 +1,16 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Database, Activity, Box, Cpu, FileJson, PlaySquare, Settings, HeartPulse } from 'lucide-react';
+import { LayoutDashboard, Database, Activity, Box, Cpu, FileJson, PlaySquare, Settings, HeartPulse, Shield } from 'lucide-react';
 
 export const Sidebar = () => {
   const links = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/enterprise', icon: Shield, label: 'Enterprise MLOps' },
+    { to: '/retraining', icon: Activity, label: 'Retraining' },
+    { to: '/experiments', icon: Activity, label: 'Experiments' },
     { to: '/inference', icon: PlaySquare, label: 'Inference' },
+    { to: '/explainability', icon: Activity, label: 'Explainability' },
+    { to: '/drift', icon: Activity, label: 'Drift Monitor' },
     { to: '/models', icon: Box, label: 'Models' },
     { to: '/datasets', icon: Database, label: 'Datasets' },
     { to: '/features', icon: FileJson, label: 'Features' },

@@ -47,6 +47,30 @@ class ModelPredictor(BasePredictor):
         self.model = self.loader.load(self.model_id, self.version)
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
+        start_time = time.time()
+        
+        # Merge requested features with Online/Offline Feature Store
+        features = request.features.copy()
+        
+        if request.entity_id and request.entity_id != "anon":
+            from app.features.store.online import global_online_store
+            from app.features.store.sync import global_sync_manager
+            
+            # 1. Try Redis
+            cached = global_online_store.read(request.entity_id)
+            if cached:
+                # requested features override stored features
+                cached.update(features)
+                features = cached
+            else:
+                # 2. Fallback to Postgres via SyncManager
+                offline = global_sync_manager.sync_entity(request.entity_id)
+                if offline:
+                    offline.update(features)
+                    features = offline
+                    
+        request.features = features
+        
         """
         Safely executes a single prediction request.
         Guarantees prediction never fires if input validation fails.
@@ -77,16 +101,38 @@ class ModelPredictor(BasePredictor):
                 
             latency_ms = (time.perf_counter() - start_time) * 1000
             
+            from datetime import datetime
+            from app.inference.explainability import LocalExplainer
+            
+            explainer = LocalExplainer(self.model)
+            explanation = explainer.explain(df)
+            
             # 4. Immutable Response Construction
             response = PredictionResponse(
                 request_id=request.request_id,
                 prediction=prediction,
-                model_id=self.model_id,
-                model_version=self.version,
-                latency_ms=latency_ms,
+                confidence=probability, # Simplified to probability for now
                 probability=probability,
-                warnings=warnings
+                latency_ms=latency_ms,
+                model_name=self.model_id,
+                model_version=self.version,
+                algorithm=self.metadata.algorithm,
+                timestamp=datetime.utcnow().isoformat(),
+                warnings=warnings,
+                top_contributors=explanation.get("top_contributors", []),
+                positive_contributors=explanation.get("positive_contributors", []),
+                negative_contributors=explanation.get("negative_contributors", []),
+                raw_scores=explanation.get("raw_scores", {})
             )
+            
+            # 5. Drift Monitoring (Background ingestion)
+            try:
+                from app.monitoring.drift.engine import global_drift_engine
+                # Flatten the feature dictionary
+                features_dict = df.iloc[0].to_dict()
+                global_drift_engine.ingest(self.model_id, features_dict, float(prediction))
+            except Exception as e:
+                logger.warning(f"Failed to ingest data for drift monitoring: {e}")
             
             logger.debug(f"Prediction generated for entity '{request.entity_id}' via alias '{self.model_alias}' in {latency_ms:.2f}ms.")
             return response

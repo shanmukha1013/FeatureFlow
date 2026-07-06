@@ -36,8 +36,8 @@ def get_platform_overview():
     except Exception: pass
     
     try:
-        from app.data.flexy_registry import registry
-        num_datasets = len(getattr(registry, "schemas", {}))
+        from app.data.dataset_registry import global_dataset_registry
+        num_datasets = len(global_dataset_registry.list_datasets())
     except Exception: pass
     
     try:

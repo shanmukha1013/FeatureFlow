@@ -23,12 +23,19 @@ class FeatureMetadata:
         nullable: Whether the resulting feature tolerates null values.
         default_value: Explicit fallback value if nulls are prohibited.
     """
+    feature_id: str
     name: str
     description: str
     version: str
     owner: str
+    source_dataset: str
     source_columns: List[str]
+    feature_type: str
+    transformation: str
     data_type: str
+    status: str = "ACTIVE"
+    created_at: str = ""
+    last_updated: str = ""
     tags: List[str] = field(default_factory=list)
     nullable: bool = True
     default_value: Optional[Any] = None

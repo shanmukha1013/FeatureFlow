@@ -26,7 +26,7 @@ def create_app() -> FastAPI:
     from fastapi.middleware.cors import CORSMiddleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # For production deploy, restrict this via ENV
+        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -42,7 +42,22 @@ def create_app() -> FastAPI:
     
     # 3. Mount Routers
     app.include_router(v1_router, prefix=f"/api/{serving_config.api_version}")
+
+    import threading
+    from app.data.discovery import DatasetDiscovery
+    from app.serving.dependencies import _prediction_engine
     
+    @app.on_event("startup")
+    def startup_event():
+        # Start Prediction Engine immediately to warm caches
+        _prediction_engine.start()
+        
+        def run_discovery():
+            discovery = DatasetDiscovery()
+            discovery.discover_datasets()
+            
+        threading.Thread(target=run_discovery, daemon=True).start()
+        
     return app
 
 # The standard ASGI entrypoint (e.g. `uvicorn app.serving.main:app`)

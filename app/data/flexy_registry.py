@@ -163,3 +163,7 @@ def register_flexy_schemas(registry: SchemaRegistry) -> None:
     
     for s in schemas:
         registry.register(s)
+
+# Global Schema Registry for Dataset Discovery
+registry = SchemaRegistry()
+register_flexy_schemas(registry)

@@ -11,8 +11,15 @@ class PredictionResponse:
     """
     request_id: str
     prediction: Any
-    model_id: str
-    model_version: str
+    confidence: Optional[float]
+    probability: Optional[float]
     latency_ms: float
-    probability: Optional[float] = None
+    model_name: str
+    model_version: str
+    algorithm: str
+    timestamp: str
     warnings: List[str] = field(default_factory=list)
+    top_contributors: List[Dict[str, Any]] = field(default_factory=list)
+    positive_contributors: List[Dict[str, Any]] = field(default_factory=list)
+    negative_contributors: List[Dict[str, Any]] = field(default_factory=list)
+    raw_scores: Dict[str, float] = field(default_factory=dict)

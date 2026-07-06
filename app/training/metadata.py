@@ -12,7 +12,9 @@ from enum import Enum
 class ModelLifecycleState(str, Enum):
     """Represents the operational status of a trained model."""
     EXPERIMENTAL = "EXPERIMENTAL"
-    ACTIVE = "ACTIVE"
+    CANDIDATE = "CANDIDATE"
+    CHALLENGER = "CHALLENGER"
+    CHAMPION = "CHAMPION"
     ARCHIVED = "ARCHIVED"
     FAILED = "FAILED"
 
@@ -33,9 +35,12 @@ class ModelMetadata:
     artifact_checksum: str
     dataset_size: int
     feature_count: int
-    feature_names: List[str]  # Added to fix Inference Layer integration bug
-    split_config: Dict[str, Any]
-    training_duration_ms: float
+    feature_names: List[str]
+    feature_importance: Dict[str, float] = field(default_factory=dict)
+    shap_summary: Optional[Dict[str, Any]] = None
+    baseline_profile: Dict[str, Any] = field(default_factory=dict)
+    split_config: Dict[str, Any] = field(default_factory=dict)
+    training_duration_ms: float = 0.0
     lifecycle_state: ModelLifecycleState = ModelLifecycleState.EXPERIMENTAL
     created_by: str = "platform"
     training_timestamp: datetime = field(default_factory=datetime.utcnow)
@@ -56,6 +61,9 @@ class ModelMetadata:
             "dataset_size": self.dataset_size,
             "feature_count": self.feature_count,
             "feature_names": self.feature_names,
+            "feature_importance": self.feature_importance,
+            "shap_summary": self.shap_summary,
+            "baseline_profile": self.baseline_profile,
             "split_config": self.split_config,
             "training_duration_ms": self.training_duration_ms,
             "lifecycle_state": self.lifecycle_state.value,

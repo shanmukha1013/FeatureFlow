@@ -64,8 +64,19 @@ class TrainingDatasetBuilder:
         if missing_features:
             raise DatasetPreparationError(f"Requested feature columns are missing from the dataset: {missing_features}")
             
-        X = df[feature_columns]
+        X = df[feature_columns].copy()
         y = df[target_column]
+        
+        # Impute missing values in features
+        from sklearn.impute import SimpleImputer
+        import pandas as pd
+        
+        imputer = SimpleImputer(strategy='median')
+        try:
+            X_imputed = imputer.fit_transform(X)
+            X = pd.DataFrame(X_imputed, columns=X.columns, index=X.index)
+        except Exception as e:
+            logger.warning(f"SimpleImputer failed, proceeding with original X. Error: {e}")
         
         logger.info(f"Dataset preparation complete. Matrix shape: X={X.shape}, Y={y.shape}")
         return X, y

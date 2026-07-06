@@ -27,40 +27,30 @@ _inference_registry = InferenceModelRegistry()
 # the InferenceModelRegistry here. For safety, we assume it starts empty 
 # and gets hydrated elsewhere.
 
-# ---------------------------------------------------------
-# PREDICTOR CACHE
-# Predictors load joblib binaries into memory. We strictly 
-# cache them per alias/version to avoid MemoryLeaks or 
-# CPU blocking during initialization.
-# ---------------------------------------------------------
-_predictor_cache: Dict[str, ModelPredictor] = {}
-_cache_lock = Lock()
-
 def get_inference_registry() -> InferenceModelRegistry:
-    """Dependency injector for the alias registry."""
     return _inference_registry
 
 def get_cached_predictor(alias: str = "default") -> ModelPredictor:
-    """
-    Dependency injector that safely resolves an alias and returns 
-    a cached, memory-resident Predictor instance.
-    """
-    # 1. Resolve alias dynamically
-    model_id, version = _inference_registry.resolve(alias)
-    
-    # 2. Check cache
-    cache_key = f"{alias}_{model_id}_{version}"
-    
-    with _cache_lock:
-        if cache_key not in _predictor_cache:
-            # 3. Initialize lazily (heavy operation, happens once)
-            _predictor_cache[cache_key] = ModelPredictor(
-                model_id=model_id,
-                version=version,
-                loader=_loader,
-                validator=_validator,
-                training_registry=_training_registry,
-                model_alias=alias
-            )
-            
-    return _predictor_cache[cache_key]
+    # Legacy wrapper for backward compatibility
+    from app.inference.exceptions import InferenceError
+    engine = get_prediction_engine()
+    model_id, version = engine.routing_registry.resolve(alias)
+    predictor = engine.predictors.get(model_id)
+    if not predictor:
+        raise InferenceError(f"Predictor for alias {alias} not found.")
+    return predictor
+
+from app.inference.engine import PredictionEngine
+
+# ---------------------------------------------------------
+# GLOBAL PREDICTION ENGINE
+# Centralizes model loading, routing, and batching logic.
+# ---------------------------------------------------------
+_prediction_engine = PredictionEngine(
+    training_registry=_training_registry,
+    artifact_store=_artifact_store
+)
+
+def get_prediction_engine() -> PredictionEngine:
+    """Dependency injector for the unified prediction engine."""
+    return _prediction_engine

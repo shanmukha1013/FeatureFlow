@@ -17,10 +17,12 @@ export const Features = () => {
 
   const columns = [
     { header: 'Feature Name', accessor: (r: any) => <span className="font-medium text-white">{r.name}</span> },
-    { header: 'Version', accessor: (r: any) => <span className="font-mono text-xs">{r.version || '1.0'}</span> },
-    { header: 'Source Columns', accessor: (r: any) => <span className="text-muted">{r.source_columns?.join(', ') || '-'}</span> },
-    { header: 'Owner', accessor: (r: any) => r.owner || 'System' },
-    { header: 'Status', accessor: () => <StatusBadge status="ACTIVE" />, align: 'right' as const }
+    { header: 'Dataset', accessor: (r: any) => <span className="text-muted">{r.source_dataset || '-'}</span> },
+    { header: 'Transformation', accessor: (r: any) => <span className="text-muted">{r.transformation || '-'}</span> },
+    { header: 'Type', accessor: (r: any) => <span className="text-muted">{r.feature_type || '-'}</span> },
+    { header: 'Version', accessor: (r: any) => <span className="font-mono text-xs">{r.version || '1.0.0'}</span> },
+    { header: 'Created', accessor: (r: any) => <span className="text-xs text-muted">{r.created_at ? new Date(r.created_at).toLocaleDateString() : '-'}</span> },
+    { header: 'Status', accessor: (r: any) => <StatusBadge status={r.status || 'ACTIVE'} />, align: 'right' as const }
   ];
 
   return (

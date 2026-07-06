@@ -66,6 +66,9 @@ class FeatureRegistry:
             
         return self._features[feature_name]
 
+    def has_feature(self, feature_name: str) -> bool:
+        return feature_name in self._features
+
     def remove(self, feature_name: str) -> None:
         """
         Evicts a feature from the registry.

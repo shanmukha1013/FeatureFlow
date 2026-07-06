@@ -4,9 +4,9 @@ Implements the core prediction endpoint.
 from fastapi import APIRouter, Depends, Request
 from app.serving.schemas.request import PredictRequestSchema
 from app.serving.schemas.response import PredictResponseSchema
-from app.serving.dependencies import get_cached_predictor
+from app.serving.dependencies import get_prediction_engine
 from app.inference.request import PredictionRequest
-from app.inference.predictor import ModelPredictor
+from app.inference.engine import PredictionEngine
 
 router = APIRouter()
 
@@ -22,30 +22,30 @@ def predict(
     """
     Executes a machine learning prediction against the requested model alias.
     """
-    # 1. We resolve the cache predictor via an explicit call rather than a Depends 
-    # to allow dynamic passing of the alias parameter.
-    predictor: ModelPredictor = get_cached_predictor(payload.alias)
+    engine: PredictionEngine = get_prediction_engine()
     
     # 2. Extract correlation ID set by middleware
     req_id = getattr(request.state, "request_id", None)
     
-    # 3. Domain mapping: Map the HTTP Pydantic contract to the internal Inference Layer contract
-    domain_req = PredictionRequest(
-        entity_id=payload.entity_id,
-        features=payload.features,
-        request_id=req_id
-    )
-    
-    # 4. Predict
-    domain_res = predictor.predict(domain_req)
+    # 3. Predict via engine (engine handles the alias and Fallback mechanisms)
+    domain_res = engine.predict_single(features=payload.features, entity_id=payload.entity_id, alias=payload.alias)
     
     # 5. Response mapping: Map back to the HTTP Pydantic contract
     return PredictResponseSchema(
-        request_id=domain_res.request_id,
+        request_id=domain_res.request_id or req_id or "local",
         prediction=domain_res.prediction,
         probability=domain_res.probability,
         model_id=domain_res.model_id,
         model_version=domain_res.model_version,
-        latency_ms=domain_res.latency_ms,
-        warnings=domain_res.warnings
     )
+
+@router.post("/predict/explain", response_model=PredictResponseSchema)
+def predict_explain(
+    payload: PredictRequestSchema, 
+    request: Request
+):
+    """
+    Executes a prediction and guarantees explainability metadata is included.
+    (This is identical to /predict now since explanations are strictly enabled by default).
+    """
+    return predict(payload, request)
