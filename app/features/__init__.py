@@ -15,7 +15,6 @@ from .exceptions import (
 )
 from .metadata import FeatureMetadata
 from .feature import BaseFeature
-from .registry import FeatureRegistry
 from .transformer import FeatureTransformer
 
 __all__ = [
@@ -26,6 +25,5 @@ __all__ = [
     "FeatureTransformationError",
     "FeatureMetadata",
     "BaseFeature",
-    "FeatureRegistry",
     "FeatureTransformer",
 ]

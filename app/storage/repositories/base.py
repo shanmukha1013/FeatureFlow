@@ -2,6 +2,7 @@ from typing import Generic, TypeVar, Type, Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete, update
+from sqlalchemy.orm import selectinload
 from app.storage.database import Base
 
 ModelType = TypeVar("ModelType", bound=Base)
@@ -12,11 +13,30 @@ class BaseRepository(Generic[ModelType]):
         self.session = session
 
     async def get(self, id: str) -> Optional[ModelType]:
-        result = await self.session.execute(select(self.model).filter(self.model.id == id))
+        result = await self.session.execute(
+            select(self.model).filter(self.model.id == id, self.model.status != 'ARCHIVED')
+        )
+        return result.scalars().first()
+        
+    async def get_including_archived(self, id: str) -> Optional[ModelType]:
+        result = await self.session.execute(
+            select(self.model).filter(self.model.id == id)
+        )
         return result.scalars().first()
 
     async def get_multi(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
-        result = await self.session.execute(select(self.model).offset(skip).limit(limit))
+        result = await self.session.execute(
+            select(self.model).filter(self.model.status != 'ARCHIVED').offset(skip).limit(limit)
+        )
+        return result.scalars().all()
+
+    async def get_active(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
+        return await self.get_multi(skip, limit)
+        
+    async def get_archived(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
+        result = await self.session.execute(
+            select(self.model).filter(self.model.status == 'ARCHIVED').offset(skip).limit(limit)
+        )
         return result.scalars().all()
 
     async def create(self, obj_in: Dict[str, Any]) -> ModelType:
@@ -35,5 +55,20 @@ class BaseRepository(Generic[ModelType]):
         return db_obj
 
     async def delete(self, id: str) -> None:
+        """Soft delete the record by setting status to ARCHIVED."""
+        await self.session.execute(
+            update(self.model).where(self.model.id == id).values(status='ARCHIVED')
+        )
+        await self.session.flush()
+        
+    async def restore(self, id: str) -> None:
+        """Restore an archived record back to ACTIVE status."""
+        await self.session.execute(
+            update(self.model).where(self.model.id == id).values(status='ACTIVE')
+        )
+        await self.session.flush()
+        
+    async def hard_delete(self, id: str) -> None:
+        """Permanently remove a record from the database. Use with extreme caution."""
         await self.session.execute(delete(self.model).where(self.model.id == id))
         await self.session.flush()

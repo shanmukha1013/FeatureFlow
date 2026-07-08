@@ -174,9 +174,9 @@ async def get_experiments(
         query = query.filter(Experiment.status == status)
         
     if sort_desc:
-        query = query.order_by(desc(getattr(Experiment, sort_by, Experiment.start_time)))
+        query = query.order_by(desc(getattr(Experiment, sort_by, Experiment.created_at)))
     else:
-        query = query.order_by(getattr(Experiment, sort_by, Experiment.start_time))
+        query = query.order_by(getattr(Experiment, sort_by, Experiment.created_at))
 
     result = await session.execute(query)
     exps = result.scalars().all()
@@ -195,7 +195,7 @@ async def get_experiments(
             "hyperparameters": e.hyperparameters,
             "metrics": e.metrics,
             "dataset": ds_name,
-            "start_time": e.start_time.isoformat() if e.start_time else None,
+            "start_time": e.created_at.isoformat() if e.created_at else None,
             "end_time": e.end_time.isoformat() if e.end_time else None,
         })
         
@@ -236,7 +236,7 @@ async def get_experiment(id: str, session: AsyncSession = Depends(get_db)):
         "hyperparameters": exp.hyperparameters,
         "metrics": exp.metrics,
         "dataset": exp.dataset.name if exp.dataset else "",
-        "start_time": exp.start_time.isoformat() if exp.start_time else None,
+        "start_time": exp.created_at.isoformat() if exp.created_at else None,
         "end_time": exp.end_time.isoformat() if exp.end_time else None,
     }
 

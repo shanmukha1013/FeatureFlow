@@ -84,3 +84,6 @@ class SchemaRegistry:
     def list_schemas(self) -> List[str]:
         """Lists all registered schema names."""
         return list(self._schemas.keys())
+
+
+global_schema_registry = SchemaRegistry()

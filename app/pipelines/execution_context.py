@@ -5,12 +5,11 @@ Ensures that execution telemetry (success, failures, validation reports,
 and storage metadata) is strongly typed and preserved for upstream audits.
 """
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 
 from app.data.validator import ValidationReport
 from app.data.profiler import ProfilingReport
-from app.storage.models import StorageMetadata
 
 @dataclass
 class DatasetExecutionReport:
@@ -22,7 +21,7 @@ class DatasetExecutionReport:
     validation_report: Optional[ValidationReport] = None
     profiling_report: Optional[ProfilingReport] = None
     feature_count: int = 0
-    storage_metadata: Optional[StorageMetadata] = None
+    storage_metadata: Optional[Any] = None  # Holds a Dataset ORM record when available
     error_message: Optional[str] = None
 
     def mark_success(self) -> None:

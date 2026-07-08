@@ -1,20 +1,19 @@
 """
 Implements the model discovery endpoint.
+Returns the active model routing table from the prediction engine.
 """
 from fastapi import APIRouter, Depends
 from app.serving.schemas.response import ModelsResponseSchema, ModelAliasSchema
-from app.serving.dependencies import get_inference_registry
+from app.serving.dependencies import get_prediction_engine
 
 router = APIRouter()
 
 @router.get("/models", response_model=ModelsResponseSchema)
-def list_models(registry = Depends(get_inference_registry)):
+def list_models(engine=Depends(get_prediction_engine)):
     """
     Returns the current operational routing table of active models.
     """
-    aliases = registry.list_aliases()
-    models_list = [
-        ModelAliasSchema(alias=alias, model_id=mid, version=ver)
-        for alias, (mid, ver) in aliases.items()
-    ]
-    return ModelsResponseSchema(aliases=models_list)
+    aliases_list = []
+    for model_id, (mid, ver) in engine.routing_registry.items():
+        aliases_list.append(ModelAliasSchema(alias=model_id, model_id=mid, version=ver))
+    return ModelsResponseSchema(aliases=aliases_list)

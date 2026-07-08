@@ -19,9 +19,11 @@ try:
         settings.database_url,
         echo=False,
         future=True,
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20
+        pool_pre_ping=True,      # verify connections before checkout
+        pool_size=20,            # handle more concurrent requests
+        max_overflow=40,         # allow spikes in connections
+        pool_timeout=30,         # wait up to 30s before giving up
+        pool_recycle=1800,       # recycle connections older than 30 mins
     )
 except Exception as e:
     logger.exception(f"Failed to initialize database engine: {e}")
@@ -43,12 +45,23 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     Dependency for FastAPI that yields an async database session.
     Closes the session automatically when the request finishes.
     """
+    from sqlalchemy.exc import IntegrityError, OperationalError
+    
     async with AsyncSessionLocal() as session:
         try:
             yield session
             await session.commit()
-        except Exception:
+        except IntegrityError as e:
             await session.rollback()
+            logger.error(f"Database Integrity Violation during request: {e}")
+            raise
+        except OperationalError as e:
+            await session.rollback()
+            logger.error(f"Database Operational Error (e.g. timeout, connection loss): {e}")
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Unexpected database transaction failure: {e}")
             raise
         finally:
             await session.close()

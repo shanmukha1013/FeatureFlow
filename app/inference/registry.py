@@ -1,48 +1,55 @@
 """
-Maintains inference-specific model selection and logical routing.
-"""
-from typing import Dict, Tuple
+InferenceModelRegistry: A lightweight in-memory registry that tracks which
+model versions are currently loaded and ready for inference.
 
-from app.inference.exceptions import InferenceError
+This is NOT a metadata store - that is PostgreSQL.
+This is purely the in-memory index of model_id -> predictor for fast routing.
+"""
+from typing import Dict, Optional
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+
 class InferenceModelRegistry:
     """
-    Maps logical aliases (e.g. 'production', 'shadow', 'champion') to 
-    physical model IDs and versions. This decouples the API layer from 
-    hardcoding specific trained artifact IDs and enables safe rollouts.
+    Maintains an in-memory map of model IDs to their loaded predictors.
+    Populated at startup by loading champions from PostgreSQL.
     """
+
     def __init__(self) -> None:
-        # Dictionary mapping alias -> (model_id, version)
-        self._aliases: Dict[str, Tuple[str, str]] = {}
-        self._default_alias: str = "default"
+        self._registry: Dict[str, object] = {}
+        self._default_model_id: Optional[str] = None
 
-    def set_alias(self, alias: str, model_id: str, version: str) -> None:
-        """Binds a logical alias securely to a concrete model artifact."""
-        if not alias or not str(alias).strip():
-            raise InferenceError("Routing alias cannot be empty or null.")
-        if not model_id or not version:
-            raise InferenceError("Target model_id and version cannot be empty.")
-            
-        self._aliases[alias] = (model_id, version)
-        logger.info(f"Inference alias '{alias}' safely bound to model '{model_id}' (v{version}).")
+    def register(self, model_id: str, predictor: object, is_default: bool = False) -> None:
+        """Register a loaded predictor under a given model_id."""
+        self._registry[model_id] = predictor
+        if is_default or not self._default_model_id:
+            self._default_model_id = model_id
+        logger.info(f"Registered predictor for model_id={model_id}, is_default={is_default}")
 
-    def set_default(self, model_id: str, version: str) -> None:
-        """Sets the fallback default model."""
-        self.set_alias(self._default_alias, model_id, version)
+    def get(self, model_id: str) -> Optional[object]:
+        """Retrieve a predictor by model_id."""
+        return self._registry.get(model_id)
 
-    def resolve(self, alias: str = None) -> Tuple[str, str]:
-        """
-        Resolves an alias to its concrete model_id and version.
-        Falls back to the default alias if none provided.
-        """
-        target = alias or self._default_alias
-        if target not in self._aliases:
-            raise InferenceError(f"Cannot resolve inference routing: No active model bound to alias '{target}'.")
-        return self._aliases[target]
-        
-    def list_aliases(self) -> Dict[str, Tuple[str, str]]:
-        """Returns a snapshot of the current operational routing table."""
-        return self._aliases.copy()
+    def get_default(self) -> Optional[object]:
+        """Returns the default/champion predictor."""
+        if self._default_model_id:
+            return self._registry.get(self._default_model_id)
+        return None
+
+    def list_model_ids(self):
+        """Returns all registered model IDs."""
+        return list(self._registry.keys())
+
+    def clear(self) -> None:
+        """Clears all registered predictors."""
+        self._registry.clear()
+        self._default_model_id = None
+
+    @property
+    def default_model_id(self) -> Optional[str]:
+        return self._default_model_id
+
+    def __len__(self) -> int:
+        return len(self._registry)

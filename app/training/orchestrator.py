@@ -222,7 +222,7 @@ class TrainingOrchestrator:
                     await AuditLogger.record(session, AuditEvent(event_name="CHAMPION_PROMOTED", component="TrainingOrchestrator", severity="INFO", payload={"new_champion": best_candidate.id, "accuracy": best_acc}))
                     logger.info(f"Initial champion promoted: {best_candidate.id}")
                     
-            await session.commit()
+                # Commit is deferred to the pipeline transaction
 
         except Exception as e:
             await session.rollback()

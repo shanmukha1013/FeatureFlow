@@ -68,18 +68,20 @@ async def get_statistics(session: AsyncSession = Depends(get_db)):
     avg_latency = 0.0
     val_failures = 0
     
-    try:
-        from app.monitoring.metrics import _backend
-        if hasattr(_backend, "counters"):
-            total_preds = _backend.counters.get("http_requests_total_{'status': '200'}", 0)
-            val_failures = _backend.counters.get("http_requests_total_{'status': '422'}", 0)
-            
-        if hasattr(_backend, "histograms"):
-            latencies = _backend.histograms.get("http_request_latency_ms_{'endpoint': '/api/v1/predict'}", [])
-            if latencies:
-                avg_latency = sum(latencies) / len(latencies)
-    except Exception:
-        pass
+    from app.storage.models import AuditLog
+    
+    # Total Predictions
+    pred_res = await session.execute(select(AuditLog).filter(AuditLog.event_name == 'PREDICTION_FINISHED'))
+    preds = pred_res.scalars().all()
+    total_preds = len(preds)
+    
+    if total_preds > 0:
+        total_time = sum([p.payload.get("latency_ms", 0) for p in preds if p.payload])
+        avg_latency = total_time / total_preds
+        
+    # Validation Failures
+    val_res = await session.execute(select(AuditLog).filter(AuditLog.event_name == 'VALIDATION_FAILED'))
+    val_failures = len(val_res.scalars().all())
         
     result_models = await session.execute(select(func.count(Model.id)))
     num_models = result_models.scalar_one()

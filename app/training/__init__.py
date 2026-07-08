@@ -16,7 +16,6 @@ from .splitter import RandomSplitter, TimeBasedSplitter
 from .trainer import LogisticRegressionTrainer, RandomForestTrainer
 from .evaluator import ClassificationEvaluator
 from .artifacts import LocalArtifactStore
-from .registry import LocalModelRegistry
 
 __all__ = [
     "TrainingError",
@@ -36,5 +35,4 @@ __all__ = [
     "RandomForestTrainer",
     "ClassificationEvaluator",
     "LocalArtifactStore",
-    "LocalModelRegistry",
 ]

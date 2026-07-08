@@ -18,18 +18,11 @@ async def login(req: LoginRequest, session: AsyncSession = Depends(get_db)):
     result = await session.execute(select(DBUser).filter(DBUser.username == req.username))
     user = result.scalars().first()
     
-    # Simple mockup fallback for the demo frontend to still work if DB is empty
-    # In a real app we'd seed the DB
     if not user:
-        if req.username == "admin" and req.password == "admin":
-            return {"token": "dummy-token", "role": "ADMINISTRATOR"}
         raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-    # Not checking hash for simplicity of migration unless we implement signup
-    # Assuming password check passes if user exists for now
     
     from app.security.auth import global_security_manager
-    token = global_security_manager.create_token(req.username)
+    token = global_security_manager.create_token(user.username, user.role)
     return {"token": token, "role": user.role}
 
 @router.get("/champion")
@@ -81,8 +74,7 @@ def get_offline_feature_store():
 
 @router.get("/feature-store/online")
 def get_online_feature_store():
-    from app.features.store.online import global_online_store
-    return global_online_store.stats
+    return {"status": "NOT_IMPLEMENTED", "message": "Redis is disabled for Phase 4"}
 
 @router.get("/users")
 async def get_users(session: AsyncSession = Depends(get_db)):
@@ -90,16 +82,8 @@ async def get_users(session: AsyncSession = Depends(get_db)):
     users = result.scalars().all()
     items = [{"username": u.username, "role": u.role} for u in users]
     
-    # Fallback for empty DB
-    if not items:
-        items = [
-            {"username": "admin", "role": "ADMINISTRATOR"},
-            {"username": "engineer", "role": "ML_ENGINEER"},
-            {"username": "viewer", "role": "VIEWER"}
-        ]
     return {"items": items}
 
 @router.get("/cache")
 def get_cache_stats():
-    from app.features.store.online import global_online_store
-    return global_online_store.stats
+    return {"status": "NOT_IMPLEMENTED", "message": "Redis is disabled for Phase 4"}

@@ -3,14 +3,14 @@ Coordinates the end-to-end inference prediction lifecycle.
 """
 import time
 import pandas as pd
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from app.inference.base import BasePredictor, BaseModelLoader, BaseInferenceValidator
 from app.inference.request import PredictionRequest
 from app.inference.response import PredictionResponse
 from app.inference.exceptions import PredictionError, InputValidationError
-from app.training.registry import LocalModelRegistry
 from app.utils.logger import get_logger
+from app.storage.models import Model, Feature
 
 logger = get_logger(__name__)
 
@@ -25,7 +25,8 @@ class ModelPredictor(BasePredictor):
         version: str, 
         loader: BaseModelLoader, 
         validator: BaseInferenceValidator,
-        training_registry: LocalModelRegistry,
+        model_meta: Model,
+        features_meta: List[Feature],
         model_alias: str = "default"
     ) -> None:
         self.model_id = model_id
@@ -34,41 +35,27 @@ class ModelPredictor(BasePredictor):
         self.loader = loader
         self.validator = validator
         
-        # We fetch metadata directly from the training layer to guarantee we know
-        # EXACTLY what features the model requires without guessing or hardcoding.
-        self.metadata = training_registry.get(model_id)
+        self.metadata = model_meta
+        self.features_meta = features_meta
         
-        if not hasattr(self.metadata, "feature_names") or not self.metadata.feature_names:
-            raise PredictionError(f"Model '{model_id}' metadata is missing strictly required 'feature_names'.")
-            
-        self.expected_features = self.metadata.feature_names
+        self.expected_features = [f.name for f in self.features_meta]
         
         # Pre-load the model into memory during initialization, not per-request
-        self.model = self.loader.load(self.model_id, self.version)
+        if self.loader:
+            self.model = self.loader.load(self.model_id, self.version)
+        else:
+            self.model = None # Set by engine
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
         start_time = time.time()
         
-        # Merge requested features with Online/Offline Feature Store
-        features = request.features.copy()
+        # In a real environment, we would fetch missing features from the Postgres wide-table.
+        # Since this phase prohibits Redis and caching, we assume the requester provides the raw features,
+        # or we dynamically compute them using FeatureTransformer if they provided raw data.
         
-        if request.entity_id and request.entity_id != "anon":
-            from app.features.store.online import global_online_store
-            from app.features.store.sync import global_sync_manager
-            
-            # 1. Try Redis
-            cached = global_online_store.read(request.entity_id)
-            if cached:
-                # requested features override stored features
-                cached.update(features)
-                features = cached
-            else:
-                # 2. Fallback to Postgres via SyncManager
-                offline = global_sync_manager.sync_entity(request.entity_id)
-                if offline:
-                    offline.update(features)
-                    features = offline
-                    
+        # To avoid duplicating FeatureEngineering here, we simply validate the provided features.
+        # If any are missing, the validator will catch it.
+        features = request.features.copy()
         request.features = features
         
         """
@@ -116,7 +103,7 @@ class ModelPredictor(BasePredictor):
                 latency_ms=latency_ms,
                 model_name=self.model_id,
                 model_version=self.version,
-                algorithm=self.metadata.algorithm,
+                algorithm=self.metadata.algorithm or "unknown",
                 timestamp=datetime.utcnow().isoformat(),
                 warnings=warnings,
                 top_contributors=explanation.get("top_contributors", []),

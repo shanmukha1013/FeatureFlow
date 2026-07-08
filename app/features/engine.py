@@ -4,10 +4,6 @@ from datetime import datetime
 from typing import List, Dict, Type
 
 from app.utils.logger import get_logger
-from app.data.dataset_registry import DatasetMetadata
-from app.features.registry import global_feature_registry
-from app.features.metadata import FeatureMetadata
-from app.features.feature import BaseFeature
 from app.monitoring.audit import AuditLogger, AuditEvent
 from app.features.builtin_transformers import (
     StandardScalerFeature, MinMaxFeature, RobustScalerFeature, LogTransformFeature, NormalizationFeature,
@@ -137,7 +133,7 @@ class FeatureEngineeringEngine:
                 features_generated += 1
                 
         # Commit all feature generations
-        await session.commit()
+        # Commit is deferred to the pipeline transaction
                     
         exec_time = int((time.time() - start_time) * 1000)
         await AuditLogger.record(session, AuditEvent(
@@ -147,6 +143,6 @@ class FeatureEngineeringEngine:
             payload={"dataset": dataset_record.name, "features_engineered": features_generated, "time_ms": exec_time}
         ))
         # Ensure final audit log commits
-        await session.commit()
+        # Commit is deferred to the pipeline transaction
         
         logger.info(f"Feature Engineering complete for {dataset_record.name}. Generated {features_generated} features in {exec_time}ms.")

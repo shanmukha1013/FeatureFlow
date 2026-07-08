@@ -6,7 +6,7 @@ from datetime import datetime
 import uuid
 
 from app.utils.logger import get_logger
-from app.inference.registry import InferenceModelRegistry
+
 from app.inference.predictor import ModelPredictor
 from app.inference.exceptions import InferenceError, PredictionError
 from app.inference.request import PredictionRequest
@@ -27,9 +27,13 @@ class PredictionEngine:
     def __init__(self, artifact_store: LocalArtifactStore):
         self.artifact_store = artifact_store
         
-        self.routing_registry = InferenceModelRegistry()
         self.validator = RequestValidator()
         
+        # We will use an in-memory dictionary for active predictors since
+        # the ML models themselves must stay in memory for fast inference.
+        # But routing information and defaults are derived from the DB.
+        self.routing_registry = {}
+        self.default_alias = None
         self.predictors: Dict[str, ModelPredictor] = {}
         
         self.stats = {
@@ -67,51 +71,27 @@ class PredictionEngine:
             # Actually, `ModelPredictor` needs the loaded ML artifact.
             for meta in active_models:
                 try:
-                    # In a real system, ModelPredictor would use ArtifactStore to load from artifact_uri
-                    import joblib
-                    # Assume meta.artifact_uri is the local path (e.g. from artifact_store.save)
-                    # For now we'll mock the predictor loading to just use the artifact_uri if possible
-                    # or we pass artifact_store to predictor
+                    # Fetch features for this dataset
+                    from app.storage.models import Feature
+                    feature_result = await session.execute(
+                        select(Feature).filter(Feature.dataset_id == meta.dataset_id)
+                    )
+                    features_meta = feature_result.scalars().all()
+                    
                     predictor = ModelPredictor(
                         model_id=meta.id,
                         version=f"v{meta.version}",
-                        loader=None, # We'll refactor predictor next
+                        loader=None,
                         validator=self.validator,
-                        training_registry=None,
+                        model_meta=meta,
+                        features_meta=features_meta,
                         model_alias=meta.id
                     )
-                    # Override predictor's model with artifact store load
-                    # Predictor constructor currently expects `loader.load(model_id)`
-                    # We'll fix `ModelPredictor` next
+                    # Load model from disk artifact
                     predictor.model = self.artifact_store.load(meta.id, f"v{meta.version}")
                     
                     self.predictors[meta.id] = predictor
-                    self.routing_registry.set_alias(meta.id, meta.id, f"v{meta.version}")
-                    
-                    # Also need feature names and metadata
-                    from app.training.metadata import ModelMetadata
-                    # Construct a dummy metadata just for Predictor usage
-                    predictor.metadata = ModelMetadata(
-                        model_id=meta.id,
-                        model_version=f"v{meta.version}",
-                        algorithm=meta.name,
-                        target_column="target",
-                        feature_version="1.0.0",
-                        dataset_version=meta.dataset.name if meta.dataset else "unknown",
-                        hyperparameters=meta.hyperparameters,
-                        metrics=meta.metrics,
-                        artifact_path=meta.artifact_uri,
-                        artifact_checksum="",
-                        dataset_size=0,
-                        feature_count=0,
-                        feature_names=[], # Predictor doesn't strictly use this unless it validates
-                        feature_importance={},
-                        shap_summary={},
-                        baseline_profile={},
-                        split_config={},
-                        training_duration_ms=0,
-                        lifecycle_state="CHAMPION"
-                    )
+                    self.routing_registry[meta.id] = (meta.id, f"v{meta.version}")
                     
                     await AuditLogger.record(session, AuditEvent(event_name="MODEL_LOADED", component="PredictionEngine", severity="INFO", payload={"model_id": meta.id, "state": "CHAMPION"}))
                 except Exception as e:
@@ -125,7 +105,7 @@ class PredictionEngine:
             )
             
             if champion_meta:
-                self.routing_registry.set_default(champion_meta.id, f"v{champion_meta.version}")
+                self.default_alias = champion_meta.id
             else:
                 logger.warning("No CHAMPION model found during Prediction Engine startup.")
 
@@ -135,12 +115,14 @@ class PredictionEngine:
             from app.inference.routing import global_traffic_router
             
             if alias == "default":
-                selected_model_id = global_traffic_router.select_model()
-                if not selected_model_id:
+                # Fallback to the first active champion if traffic router is unconfigured
+                model_id = global_traffic_router.select_model() or self.default_alias
+                if not model_id:
                     raise InferenceError("No champion or challenger models configured for traffic routing.")
-                model_id = selected_model_id
             else:
-                model_id, version = self.routing_registry.resolve(alias)
+                model_id, version = self.routing_registry.get(alias, (None, None))
+                if not model_id:
+                    raise InferenceError(f"Alias {alias} not found in routing registry.")
                 
             predictor = self.predictors.get(model_id)
             

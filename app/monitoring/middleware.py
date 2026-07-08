@@ -5,7 +5,6 @@ import uuid
 import time
 from fastapi import Request
 from app.monitoring.logger import correlation_id_var
-from app.monitoring.metrics import MetricsRegistry
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,10 +27,8 @@ async def monitoring_middleware(request: Request, call_next):
     try:
         response = await call_next(request)
         
-        # 3. Emit Metrics
+        # 3. Compute Latency
         latency = (time.perf_counter() - start_time) * 1000
-        MetricsRegistry.histogram("http_request_latency_ms", latency, {"endpoint": request.url.path})
-        MetricsRegistry.increment("http_requests_total", 1, {"status": str(response.status_code)})
         
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Process-Time"] = str(latency)

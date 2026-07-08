@@ -128,7 +128,9 @@ class DriftEngine:
                         "baseline_std": b_std,
                         "live_std": live_std
                     })
-                    AuditLogger.record(AuditEvent(event_name="FEATURE_DRIFT", component="DriftEngine", severity=severity.value, payload={"feature": feature, "score": psi}))
+                    # Log drift event to application logs.
+                    # PostgreSQL persistence happens asynchronously via the drift API endpoint.
+                    logger.warning(f"FEATURE_DRIFT detected: feature={feature}, psi_score={psi:.4f}, severity={severity.value}")
             
         overall_severity = DriftSeverity.NONE
         if max_psi >= self.psi_threshold_critical:
@@ -137,7 +139,9 @@ class DriftEngine:
             overall_severity = DriftSeverity.WARNING
             
         if overall_severity != DriftSeverity.NONE:
-            AuditLogger.record(AuditEvent(event_name="DRIFT_DETECTED", component="DriftEngine", severity=overall_severity.value, payload={"model_id": model_id, "max_psi": max_psi}))
+            # Log drift event to application logs.
+            # PostgreSQL persistence happens asynchronously via the drift API endpoint.
+            logger.warning(f"DRIFT_DETECTED: model_id={model_id}, max_psi={max_psi:.4f}, severity={overall_severity.value}")
             
         recs = []
         if overall_severity == DriftSeverity.CRITICAL:

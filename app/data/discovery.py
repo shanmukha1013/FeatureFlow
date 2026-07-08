@@ -15,7 +15,7 @@ from app.monitoring.audit import AuditLogger, AuditEvent
 from app.data.loader import CSVDataLoader
 from app.data.validator import DataValidator
 from app.data.profiler import DataProfiler
-from app.data.flexy_registry import registry as schema_registry
+from app.data.schema import global_schema_registry as schema_registry, DatasetSchema, ColumnSchema
 from app.storage.repositories.core import DatasetRepository
 from app.storage.models import Dataset
 
@@ -42,64 +42,54 @@ class DatasetDiscovery:
         import traceback
         
         start_time = time.time()
-        try:
-            # 1. Load Data
-            df = self.loader.load(relative_path)
-            
-            # 2. Validate Data
+        # 1. Load Data
+        df = self.loader.load(relative_path)
+        
+        # 2. Validate Data
+        if schema_registry.has_schema(dataset_name):
             schema = schema_registry.get(dataset_name)
-            validator = DataValidator(schema=schema)
-            val_report = validator.validate(df)
+        else:
+            # Generic schema inferred dynamically from dataset for generic domain-agnostic validation
+            cols = [ColumnSchema(col, str(df[col].dtype), required=False) for col in df.columns]
+            schema = DatasetSchema(name=dataset_name, columns=cols, entity_id_column=df.columns[0] if len(df.columns) > 0 else "id")
+            schema_registry.register(schema)
             
-            # Update metadata (Dataset) status
-            dataset_record.status = "VALID" if val_report.is_valid else "INVALID"
-            # Note: For strict correctness, we'll store this in ValidationReport later
-            
-            await AuditLogger.record(session, AuditEvent(
-                event_name="DATASET_VALIDATED",
-                component="DatasetDiscovery",
-                severity="INFO",
-                payload={"dataset_id": dataset_record.id, "is_valid": val_report.is_valid}
-            ))
-            
-            # 3. Profile Data
-            prof_report = self.profiler.profile(df)
-            
-            execution_time_ms = int((time.time() - start_time) * 1000)
-            
-            await AuditLogger.record(session, AuditEvent(
-                event_name="PROFILING_COMPLETED",
-                component="DatasetDiscovery",
-                severity="INFO",
-                payload={"dataset_id": dataset_record.id, "execution_time_ms": execution_time_ms, "rows_processed": prof_report.row_count}
-            ))
-            
-            # Flush changes before heavy ML processing
-            await session.commit()
-            
-            # 4. Feature Engineering Pipeline
-            from app.features.engine import FeatureEngineeringEngine
-            feature_engine = FeatureEngineeringEngine()
-            await feature_engine.execute(session, dataset_record)
-            
-            # 5. Training Orchestration Pipeline
-            from app.training.orchestrator import TrainingOrchestrator
-            trainer = TrainingOrchestrator(data_dir=self.data_dir)
-            await trainer.execute(session, dataset_record, relative_path)
-            
-        except Exception as e:
-            error_msg = f"{e}\n{traceback.format_exc()}"
-            logger.error(f"Failed to process dataset {dataset_name}: {error_msg}")
-            
-            await session.rollback()
-            dataset_record.status = "FAILED"
-            await AuditLogger.record(session, AuditEvent(
-                event_name="PIPELINE_FAILED",
-                component="DatasetDiscovery",
-                severity="ERROR",
-                payload={"dataset_id": dataset_record.id, "error": error_msg}
-            ))
-            await session.commit()
+        validator = DataValidator(schema=schema)
+        val_report = validator.validate(df)
+        
+        # Update metadata (Dataset) status
+        dataset_record.status = "VALID" if val_report.is_valid else "INVALID"
+        
+        await AuditLogger.record(session, AuditEvent(
+            event_name="DATASET_VALIDATED",
+            component="DatasetDiscovery",
+            severity="INFO",
+            payload={"dataset_id": dataset_record.id, "is_valid": val_report.is_valid}
+        ))
+        
+        # 3. Profile Data
+        prof_report = self.profiler.profile(df)
+        
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        
+        await AuditLogger.record(session, AuditEvent(
+            event_name="PROFILING_COMPLETED",
+            component="DatasetDiscovery",
+            severity="INFO",
+            payload={"dataset_id": dataset_record.id, "execution_time_ms": execution_time_ms, "rows_processed": prof_report.row_count}
+        ))
+        
+        # Commit is deferred to the pipeline transaction
+        
+        # 4. Feature Engineering Pipeline
+        from app.features.engine import FeatureEngineeringEngine
+        feature_engine = FeatureEngineeringEngine()
+        await feature_engine.execute(session, dataset_record)
+        
+        # 5. Training Orchestration Pipeline
+        from app.training.orchestrator import TrainingOrchestrator
+        trainer = TrainingOrchestrator(data_dir=self.data_dir)
+        await trainer.execute(session, dataset_record, relative_path)
 
     async def _async_discover_datasets(self) -> List[Dataset]:
         logger.info(f"Initiating dataset discovery in '{self.data_dir}'.")
@@ -179,14 +169,16 @@ class DatasetDiscovery:
                         payload={"dataset_id": dataset_record.id, "dataset_name": dataset_name}
                     ))
                     
-                    # Commit dataset creation before processing
-                    await session.commit()
+                    # Commit dataset creation before processing is deferred
 
                     logger.info(f"Introspected and registered dataset: '{dataset_name}'")
                     
                     # Trigger Pipeline
                     relative_path = os.path.relpath(file_path, self.data_dir)
                     await self._process_dataset(session, dataset_record, relative_path, dataset_name)
+                    
+                    # Transaction Commit for the entire pipeline of this dataset
+                    await session.commit()
                     
                 except Exception as e:
                     import traceback

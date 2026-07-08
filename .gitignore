@@ -9,3 +9,9 @@ experiments/
 app/frontend/node_modules/
 app/frontend/dist/
 .pytest_cache/
+*.db
+*.db-journal
+test.db
+test.db-journal
+scratch/
+tests/models/

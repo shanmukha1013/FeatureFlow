@@ -1,49 +1,99 @@
 """
-Why this file exists: Unit tests for ML engine components.
-Responsibility: Verify model training, metrics generation, and inference logic.
-How it interacts: Directly instantiates ML classes without the API layer.
-Suggestions for future extensions: Add data drift detection tests on synthetic skewed data.
+Unit tests for FeatureFlow ML Training and Inference components.
+Tests real trainers, evaluators, artifact store, and prediction engine.
 """
 import pytest
-from app.ml.training import ModelTrainer
-from app.ml.inference import InferenceEngine
-from app.core.exceptions import TrainingError, ModelNotFoundError
+import os
+import shutil
 import pandas as pd
+import numpy as np
 
-def test_model_trainer_success(synthetic_dataset_path):
-    trainer = ModelTrainer(models_dir="tests/models/")
-    df = pd.read_csv(synthetic_dataset_path)
+from app.training.trainer import LogisticRegressionTrainer, RandomForestTrainer
+from app.training.evaluator import ClassificationEvaluator
+from app.training.artifacts import LocalArtifactStore
+from app.training.exceptions import TrainingFailure
+from app.inference.engine import PredictionEngine
+from app.inference.exceptions import InferenceError, PredictionError
+
+
+@pytest.fixture
+def sample_dataset():
+    """Create a synthetic tabular dataset for binary classification."""
+    np.random.seed(42)
+    X = pd.DataFrame({
+        "feature1": np.random.randn(100),
+        "feature2": np.random.randn(100) * 10,
+        "feature3": np.random.randint(0, 5, 100)
+    })
+    y = pd.Series(np.random.randint(0, 2, 100))
+    return X, y
+
+
+@pytest.fixture
+def temp_artifact_store(tmp_path):
+    store = LocalArtifactStore(base_dir=str(tmp_path / "models"))
+    yield store
+
+
+def test_logistic_regression_trainer_success(sample_dataset):
+    X, y = sample_dataset
+    trainer = LogisticRegressionTrainer(max_iter=100)
+    assert trainer.algorithm_name == "LogisticRegression"
     
-    artifact_path, metrics = trainer.train_churn_model(df, "v1")
+    model = trainer.train(X, y)
+    assert model is not None
+    assert hasattr(model, "predict")
+    assert hasattr(model, "predict_proba")
+
+
+def test_random_forest_trainer_success(sample_dataset):
+    X, y = sample_dataset
+    trainer = RandomForestTrainer(n_estimators=10, random_state=42)
+    assert trainer.algorithm_name == "RandomForest"
+    
+    model = trainer.train(X, y)
+    assert model is not None
+    preds = model.predict(X)
+    assert len(preds) == len(y)
+
+
+def test_classification_evaluator_success(sample_dataset):
+    X, y = sample_dataset
+    trainer = LogisticRegressionTrainer()
+    model = trainer.train(X, y)
+    
+    evaluator = ClassificationEvaluator()
+    metrics = evaluator.evaluate(model, X, y)
     
     assert "accuracy" in metrics
-    assert "f1_score" in metrics
-    assert artifact_path.endswith("churn_model_v1.joblib")
+    assert "precision" in metrics
+    assert "recall" in metrics
+    assert "f1" in metrics
+    assert "classification_report" in metrics
 
-def test_model_trainer_missing_target(synthetic_dataset_path):
-    trainer = ModelTrainer(models_dir="tests/models/")
-    df = pd.read_csv(synthetic_dataset_path)
-    df = df.drop(columns=["churn"])
-    
-    with pytest.raises(TrainingError):
-        trainer.train_churn_model(df, "v2")
 
-def test_inference_engine(synthetic_dataset_path):
-    # Train a model first
-    trainer = ModelTrainer(models_dir="tests/models/")
-    df = pd.read_csv(synthetic_dataset_path)
-    artifact_path, _ = trainer.train_churn_model(df, "v_infer")
+def test_local_artifact_store_save_and_load(sample_dataset, temp_artifact_store):
+    X, y = sample_dataset
+    trainer = LogisticRegressionTrainer()
+    model = trainer.train(X, y)
     
-    # Test Inference
-    engine = InferenceEngine()
-    engine.load_model("test_model", artifact_path)
+    model_id = "test_model_01"
+    version = "1"
     
-    features = {"age": 45, "account_balance": 2000.0, "num_logins": 5}
-    prediction = engine.predict("test_model", features)
+    path, checksum = temp_artifact_store.save(model, model_id, version)
+    assert os.path.exists(path)
+    assert checksum is not None
+    assert temp_artifact_store.exists(model_id, version)
     
-    assert prediction in [0, 1]
+    loaded_model = temp_artifact_store.load(model_id, version, expected_checksum=checksum)
+    assert hasattr(loaded_model, "predict")
+    
+    temp_artifact_store.delete(model_id, version)
+    assert not temp_artifact_store.exists(model_id, version)
 
-def test_inference_engine_model_not_found():
-    engine = InferenceEngine()
-    with pytest.raises(ModelNotFoundError):
-        engine.predict("nonexistent_model", {"feature": 1})
+
+@pytest.mark.asyncio
+async def test_prediction_engine_no_model_error(temp_artifact_store):
+    engine = PredictionEngine(artifact_store=temp_artifact_store)
+    with pytest.raises((InferenceError, PredictionError)):
+        await engine.predict_single({"feature1": 1.0}, alias="nonexistent")

@@ -1,47 +1,45 @@
 """
-Retrieves serialized models for inference.
-"""
-from typing import Any
+RegistryModelLoader: Loads trained ML model artifacts from the local artifact store.
 
+Acts as the bridge between the persisted artifact on disk and the in-memory
+ModelPredictor at inference time.
+"""
 from app.inference.base import BaseModelLoader
-from app.inference.exceptions import ModelLoadError
 from app.training.artifacts import LocalArtifactStore
-from app.training.registry import LocalModelRegistry
+from app.inference.exceptions import ModelLoadError
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+
 class RegistryModelLoader(BaseModelLoader):
     """
-    Safely loads a model binary explicitly bound to its metadata in the Training Registry.
-    Validates cryptographic checksums if available to prevent corrupted inference.
+    Loads serialized scikit-learn model artifacts from the LocalArtifactStore.
     """
-    def __init__(self, registry: LocalModelRegistry, artifact_store: LocalArtifactStore) -> None:
-        self.registry = registry
-        self.artifact_store = artifact_store
 
-    def load(self, model_id: str, version: str) -> Any:
-        logger.info(f"Initiating load sequence for model '{model_id}' (v{version}).")
+    def __init__(self, artifact_store: LocalArtifactStore = None) -> None:
+        self.artifact_store = artifact_store or LocalArtifactStore()
+
+    def load(self, model_id: str, version: str):
+        """
+        Loads the model artifact for the given model_id and version string.
+
+        Args:
+            model_id: The unique model identifier (e.g. 'mdl_auctions_randomforest_v1').
+            version:  The version tag (e.g. 'v1').
+
+        Returns:
+            The deserialized scikit-learn model object.
+
+        Raises:
+            ModelLoadError: If the artifact cannot be found or deserialized.
+        """
         try:
-            # 1. Fetch authoritative metadata
-            metadata = self.registry.get(model_id)
-            
-            if metadata.model_version != version:
-                raise ModelLoadError(
-                    f"Version mismatch. Requested v{version}, but registry head for '{model_id}' is v{metadata.model_version}."
-                )
-                
-            # 2. Load the binary, strictly verifying its checksum against the metadata
-            model = self.artifact_store.load(
-                model_id=model_id, 
-                version=version, 
-                expected_checksum=metadata.artifact_checksum
-            )
-            
-            logger.info(f"Successfully loaded and verified model '{model_id}'.")
+            logger.info(f"Loading artifact for model_id={model_id}, version={version}")
+            model = self.artifact_store.load(model_id, version)
+            logger.info(f"Artifact loaded successfully: {model_id}")
             return model
-            
+        except FileNotFoundError as e:
+            raise ModelLoadError(f"Artifact not found for model_id={model_id}, version={version}: {e}") from e
         except Exception as e:
-            error_msg = f"Failed to safely load model '{model_id}' (v{version}): {e}"
-            logger.error(error_msg)
-            raise ModelLoadError(error_msg) from e
+            raise ModelLoadError(f"Failed to deserialize artifact for model_id={model_id}: {e}") from e

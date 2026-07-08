@@ -1,28 +1,31 @@
 """
-Abstract backend interfaces for telemetry emission.
-Enables swapping local loggers for Prometheus/OpenTelemetry without redesign.
+Abstract base contracts for monitoring backends.
+
+Defines interfaces for metric collection and audit logging backends
+so that concrete implementations can be swapped freely.
 """
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any, Dict
+
 
 class BaseMetricBackend(ABC):
+    """Abstract interface for metric storage backends."""
+
     @abstractmethod
-    def increment_counter(self, name: str, value: int = 1, tags: Dict[str, str] = None) -> None:
-        """Records a cumulative event."""
-        ...
-        
-    @abstractmethod
-    def set_gauge(self, name: str, value: float, tags: Dict[str, str] = None) -> None:
-        """Records a point-in-time value."""
-        ...
-        
-    @abstractmethod
-    def record_histogram(self, name: str, value: float, tags: Dict[str, str] = None) -> None:
-        """Records a distribution of values (e.g., latency)."""
+    def record_metric(self, name: str, value: float, tags: Dict[str, str] = None) -> None:
+        """Record a numeric metric with optional tags."""
         ...
 
-class BaseAuditBackend(ABC):
     @abstractmethod
-    def record_event(self, event: Dict[str, Any]) -> None:
-        """Persists an immutable, structured audit event."""
+    def flush(self) -> None:
+        """Flush any buffered metrics to the backend."""
+        ...
+
+
+class BaseAuditBackend(ABC):
+    """Abstract interface for audit event storage backends."""
+
+    @abstractmethod
+    def record_event(self, event_data: Dict[str, Any]) -> None:
+        """Persist a structured audit event."""
         ...
