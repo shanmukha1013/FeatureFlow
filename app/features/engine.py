@@ -1,7 +1,7 @@
 import uuid
 import time
 from datetime import datetime
-from typing import List, Dict, Type
+from typing import List, Dict, Type, Any
 
 from app.utils.logger import get_logger
 from app.monitoring.audit import AuditLogger, AuditEvent

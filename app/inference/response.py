@@ -2,7 +2,7 @@
 Defines the immutable prediction response contract.
 """
 from dataclasses import dataclass, field
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Dict
 
 @dataclass(frozen=True)
 class PredictionResponse:
