@@ -67,102 +67,86 @@ class FeatureEngineeringEngine:
         if "bool" in dtype or "is_" in col_lower or "has_" in col_lower:
             return "boolean"
         if "int" in dtype or "float" in dtype:
-            # If it has few unique values it might be categorical, but we don't have cardinality here 
-            # so we map to numeric by default unless ID
             if col_lower.endswith("_id") or col_lower == "id":
                 return "categorical"
             return "numeric"
         
-        # Object/String
         if "description" in col_lower or "text" in col_lower or "comment" in col_lower:
             return "text"
         return "categorical"
 
-    def execute(self, dataset_meta: DatasetMetadata) -> None:
+    async def execute(self, session, dataset_record) -> None:
         """
         Generates and registers features for a discovered dataset.
         """
-        logger.info(f"Starting Feature Engineering for {dataset_meta.dataset_name}")
+        from app.storage.repositories.core import FeatureRepository
+        feature_repo = FeatureRepository(session)
+        
+        logger.info(f"Starting Feature Engineering for {dataset_record.name}")
         start_time = time.time()
         
         features_generated = 0
         now_str = datetime.utcnow().isoformat()
         
-        for col, dtype in dataset_meta.inferred_dtypes.items():
+        dtypes_to_process = dataset_record.inferred_dtypes if dataset_record.inferred_dtypes else {}
+        
+        for col, dtype in dtypes_to_process.items():
             semantic_type = self._determine_semantic_type(col, dtype)
             transformers = FEATURE_MAPPINGS.get(semantic_type, [])
             
             for transformer_info in transformers:
-                feat_name = f"{dataset_meta.dataset_name}_{col}_{transformer_info['name']}"
+                feat_name = f"{dataset_record.name}_{col}_{transformer_info['name']}"
                 
-                # Check for existing
-                version = "1.0.0"
-                if global_feature_registry.has_feature(feat_name):
-                    # Bump version (naive implementation: increment minor)
-                    existing = global_feature_registry.get(feat_name)
-                    v_parts = existing.metadata.version.split('.')
-                    version = f"{v_parts[0]}.{int(v_parts[1]) + 1}.0"
+                # Check for existing feature in DB
+                from sqlalchemy.future import select
+                from app.storage.models import Feature
+                existing = await session.execute(
+                    select(Feature).filter(Feature.dataset_id == dataset_record.id, Feature.name == feat_name)
+                )
+                existing_feat = existing.scalars().first()
+                
+                version = 1
+                if existing_feat:
+                    version = existing_feat.version + 1
+                    existing_feat.version = version
+                    existing_feat.dtype = transformer_info['dtype']
+                    existing_feat.transformation = transformer_info['transformation']
                     
-                    AuditLogger.record(AuditEvent(
+                    await AuditLogger.record(session, AuditEvent(
                         event_name="FEATURE_UPDATED",
                         component="FeatureEngine",
                         severity="INFO",
                         payload={"feature_name": feat_name, "new_version": version}
                     ))
                 else:
-                    AuditLogger.record(AuditEvent(
+                    new_feat = await feature_repo.create({
+                        "dataset_id": dataset_record.id,
+                        "name": feat_name,
+                        "dtype": transformer_info['dtype'],
+                        "transformation": transformer_info['transformation'],
+                        "status": "ACTIVE"
+                    })
+                    
+                    await AuditLogger.record(session, AuditEvent(
                         event_name="FEATURE_GENERATED",
                         component="FeatureEngine",
                         severity="INFO",
-                        payload={"feature_name": feat_name}
+                        payload={"feature_name": feat_name, "feature_id": new_feat.id}
                     ))
                 
-                feat_metadata = FeatureMetadata(
-                    feature_id=str(uuid.uuid4()),
-                    name=feat_name,
-                    description=f"Auto-engineered feature via {transformer_info['transformation']} on {col}",
-                    version=version,
-                    owner="auto_feature_engine",
-                    source_dataset=dataset_meta.dataset_name,
-                    source_columns=[col],
-                    feature_type=semantic_type.capitalize(),
-                    transformation=transformer_info['transformation'],
-                    data_type=transformer_info['dtype'],
-                    status="ACTIVE",
-                    created_at=now_str,
-                    last_updated=now_str,
-                    tags=["auto-engineered"]
-                )
+                features_generated += 1
                 
-                try:
-                    feat_instance = transformer_info['class'](metadata=feat_metadata)
-                    
-                    # Remove old version if updating
-                    if global_feature_registry.has_feature(feat_name):
-                        global_feature_registry.remove(feat_name)
-                        
-                    global_feature_registry.register(feat_instance)
-                    features_generated += 1
-                    
-                    AuditLogger.record(AuditEvent(
-                        event_name="FEATURE_REGISTERED",
-                        component="FeatureEngine",
-                        severity="INFO",
-                        payload={"feature_id": feat_metadata.feature_id, "feature_name": feat_name}
-                    ))
-                except Exception as e:
-                    AuditLogger.record(AuditEvent(
-                        event_name="FEATURE_FAILED",
-                        component="FeatureEngine",
-                        severity="ERROR",
-                        payload={"feature_name": feat_name, "error": str(e)}
-                    ))
+        # Commit all feature generations
+        await session.commit()
                     
         exec_time = int((time.time() - start_time) * 1000)
-        AuditLogger.record(AuditEvent(
+        await AuditLogger.record(session, AuditEvent(
             event_name="FEATURE_EXECUTION_TIME",
             component="FeatureEngine",
             severity="INFO",
-            payload={"dataset": dataset_meta.dataset_name, "features_engineered": features_generated, "time_ms": exec_time}
+            payload={"dataset": dataset_record.name, "features_engineered": features_generated, "time_ms": exec_time}
         ))
-        logger.info(f"Feature Engineering complete for {dataset_meta.dataset_name}. Generated {features_generated} features in {exec_time}ms.")
+        # Ensure final audit log commits
+        await session.commit()
+        
+        logger.info(f"Feature Engineering complete for {dataset_record.name}. Generated {features_generated} features in {exec_time}ms.")

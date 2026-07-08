@@ -1,12 +1,8 @@
-"""
-Immutable audit event recording.
-"""
 import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
-from app.monitoring.backends.base import BaseAuditBackend
-from app.monitoring.backends.local import LocalAuditBackend
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.monitoring.config import monitoring_config
 
 @dataclass(frozen=True)
@@ -33,13 +29,14 @@ class AuditEvent:
             "payload": self.payload
         }
 
-_backend: BaseAuditBackend = LocalAuditBackend()
-
 class AuditLogger:
     """
     Centralized router for audit events.
+    Now requires a database session to persist to PostgreSQL.
     """
     @staticmethod
-    def record(event: AuditEvent) -> None:
+    async def record(session: AsyncSession, event: AuditEvent) -> None:
         if monitoring_config.enable_audit:
-            _backend.record_event(event.to_dict())
+            from app.services.audit import AuditService
+            audit_service = AuditService(session)
+            await audit_service.record(event)

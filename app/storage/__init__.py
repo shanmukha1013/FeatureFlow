@@ -9,7 +9,6 @@ from .exceptions import (
     FeatureStorageError,
     FeatureNotFoundError,
 )
-from .models import StorageMetadata, FeatureRecord
 from .base import BaseFeatureStore
 from .offline_store import PostgresOfflineStore
 from .online_store import RedisOnlineStore
@@ -22,8 +21,6 @@ __all__ = [
     "OnlineStorageError",
     "FeatureStorageError",
     "FeatureNotFoundError",
-    "StorageMetadata",
-    "FeatureRecord",
     "BaseFeatureStore",
     "PostgresOfflineStore",
     "RedisOnlineStore",

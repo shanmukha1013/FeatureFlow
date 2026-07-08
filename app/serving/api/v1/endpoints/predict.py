@@ -15,7 +15,7 @@ router = APIRouter()
 # Using standard `def` allows FastAPI to safely offload execution to a background 
 # threadpool, preventing the asynchronous event loop from blocking.
 @router.post("/predict", response_model=PredictResponseSchema)
-def predict(
+async def predict(
     payload: PredictRequestSchema, 
     request: Request
 ):
@@ -28,7 +28,7 @@ def predict(
     req_id = getattr(request.state, "request_id", None)
     
     # 3. Predict via engine (engine handles the alias and Fallback mechanisms)
-    domain_res = engine.predict_single(features=payload.features, entity_id=payload.entity_id, alias=payload.alias)
+    domain_res = await engine.predict_single(features=payload.features, entity_id=payload.entity_id, alias=payload.alias)
     
     # 5. Response mapping: Map back to the HTTP Pydantic contract
     return PredictResponseSchema(
@@ -40,7 +40,7 @@ def predict(
     )
 
 @router.post("/predict/explain", response_model=PredictResponseSchema)
-def predict_explain(
+async def predict_explain(
     payload: PredictRequestSchema, 
     request: Request
 ):
@@ -48,4 +48,4 @@ def predict_explain(
     Executes a prediction and guarantees explainability metadata is included.
     (This is identical to /predict now since explanations are strictly enabled by default).
     """
-    return predict(payload, request)
+    return await predict(payload, request)

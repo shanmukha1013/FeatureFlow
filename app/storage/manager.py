@@ -10,8 +10,19 @@ from typing import Any, List
 from datetime import datetime
 
 from app.storage.base import BaseFeatureStore
-from app.storage.models import StorageMetadata
 from app.storage.exceptions import StorageValidationError
+from dataclasses import dataclass
+
+@dataclass
+class StorageMetadata:
+    dataset_name: str
+    version: str
+    created_at: datetime
+    row_count: int
+    feature_count: int
+    schema_version: str
+    entity_id_column: str
+    integrity_hash: str
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

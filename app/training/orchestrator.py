@@ -2,26 +2,23 @@ import time
 import uuid
 import pandas as pd
 from typing import List, Dict, Any
+from datetime import datetime
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from app.utils.logger import get_logger
-from app.data.dataset_registry import DatasetMetadata, global_dataset_registry
-from app.features.registry import global_feature_registry
 from app.features.transformer import FeatureTransformer
 from app.training.dataset import TrainingDatasetBuilder
 from app.training.splitter import RandomSplitter
 from app.training.trainer import LogisticRegressionTrainer, DecisionTreeTrainer, RandomForestTrainer
 from app.training.evaluator import ClassificationEvaluator
 from app.training.artifacts import LocalArtifactStore
-from app.training.registry import LocalModelRegistry
-from app.training.metadata import ModelMetadata, ModelLifecycleState
 from app.monitoring.audit import AuditLogger, AuditEvent
-from app.serving.dependencies import _training_registry
+from app.storage.repositories.core import ModelRepository, ChampionModelRepository, ExperimentRepository, FeatureRepository
+from app.storage.models import Dataset, Feature, Model, ChampionModel, Experiment
 
 logger = get_logger(__name__)
-
-# Reusing the registry attached to the dependency injection context if possible, 
-# or just referencing it. The user said: "Update GET /management/models Return live registry."
-# The `registries.py` endpoint uses `_training_registry` from `app.serving.dependencies`.
 
 class TrainingOrchestrator:
     def __init__(self, data_dir: str = "datasets/raw"):
@@ -30,12 +27,10 @@ class TrainingOrchestrator:
         self.splitter = RandomSplitter(test_size=0.2)
         self.evaluator = ClassificationEvaluator()
         self.artifact_store = LocalArtifactStore()
-        self.registry = _training_registry
-        self.feature_transformer = FeatureTransformer(global_feature_registry)
+        self.feature_transformer = FeatureTransformer()
 
     def _select_target_column(self, df: pd.DataFrame, dataset_name: str) -> str:
         """Heuristically select a target column for automated training."""
-        # Prefer 'target', 'label', 'is_', 'has_'
         for col in df.columns:
             lower = col.lower()
             if lower in ['target', 'label', 'class', 'outcome']:
@@ -43,53 +38,47 @@ class TrainingOrchestrator:
             if lower.startswith('is_') or lower.startswith('has_'):
                 return col
                 
-        # Fallback to the last column that isn't an ID
         valid_cols = [c for c in df.columns if not c.lower().endswith('id')]
         if valid_cols:
             return valid_cols[-1]
         return df.columns[-1]
 
-    def _get_features_for_dataset(self, dataset_name: str) -> List[str]:
-        features = []
-        for feat_name in global_feature_registry.list_features():
-            f = global_feature_registry.get(feat_name)
-            if f.metadata.source_dataset == dataset_name:
-                features.append(feat_name)
+    async def _get_features_for_dataset(self, session: AsyncSession, dataset_id: str) -> List[Feature]:
+        feature_repo = FeatureRepository(session)
+        features = await feature_repo.get_by_dataset(dataset_id)
         return features
 
-    def execute(self, dataset_meta: DatasetMetadata) -> None:
-        dataset_name = dataset_meta.dataset_name
+    async def execute(self, session: AsyncSession, dataset_record: Dataset, relative_path: str = None) -> None:
+        dataset_name = dataset_record.name
         logger.info(f"Starting Training Orchestration for dataset '{dataset_name}'")
         
         try:
             from app.data.loader import CSVDataLoader
             loader = CSVDataLoader(self.data_dir)
-            df_raw = loader.load(dataset_meta.relative_path)
+            if not relative_path:
+                relative_path = f"raw/{dataset_name}.csv"
+            df_raw = loader.load(relative_path)
             
             target_col = self._select_target_column(df_raw, dataset_name)
-            feature_names = self._get_features_for_dataset(dataset_name)
             
-            if not feature_names:
+            features = await self._get_features_for_dataset(session, dataset_record.id)
+            
+            if not features:
                 logger.warning(f"No engineered features found for dataset {dataset_name}. Skipping training.")
                 return
                 
-            logger.info(f"Transforming {len(feature_names)} features for training.")
-            df_features = self.feature_transformer.transform(df_raw, feature_names)
+            logger.info(f"Transforming {len(features)} features for training.")
+            df_features = self.feature_transformer.transform(df_raw, features)
             
-            # Merge target column into features dataframe so we can split it
             df_features[target_col] = df_raw[target_col]
-            
-            # Drop rows where the target is missing
             df_features.dropna(subset=[target_col], inplace=True)
             
-            # Label Encode the target to prevent classifier errors with string classes
             from sklearn.preprocessing import LabelEncoder
             df_features[target_col] = LabelEncoder().fit_transform(df_features[target_col])
             
-            # Prepare Training Dataset
+            feature_names = [f.name for f in features]
             X, y = self.dataset_builder.prepare(df_features, feature_names, target_col)
             
-            # Train/Test Split
             X_train, X_test, y_train, y_test = self.splitter.split(X, y)
             
             trainers = [
@@ -99,133 +88,107 @@ class TrainingOrchestrator:
             ]
             
             models_trained = []
+            experiment_repo = ExperimentRepository(session)
+            model_repo = ModelRepository(session)
+            champion_repo = ChampionModelRepository(session)
             
             for trainer in trainers:
                 algo_name = trainer.algorithm_name
                 
-                # 1. Start Experiment
-                from app.training.experiments.registry import global_experiment_registry
-                from app.training.experiments.metadata import Experiment, ExperimentState
-                import uuid
-                from datetime import datetime
+                exp_name = f"Train {algo_name} on {dataset_name}"
                 
-                run_id = str(uuid.uuid4())
-                exp_id = f"exp_{dataset_name}_{algo_name.lower()}_{int(time.time())}"
+                experiment = await experiment_repo.create({
+                    "dataset_id": dataset_record.id,
+                    "name": exp_name,
+                    "algorithm": algo_name,
+                    "hyperparameters": trainer.hyperparameters,
+                    "status": "RUNNING"
+                })
                 
-                experiment = Experiment(
-                    experiment_id=exp_id,
-                    experiment_name=f"Train {algo_name} on {dataset_name}",
-                    run_id=run_id,
-                    dataset=dataset_name,
-                    dataset_version=dataset_meta.version,
-                    feature_version="1.0.0",
-                    algorithm=algo_name,
-                    hyperparameters=trainer.hyperparameters,
-                    tags=["automated", algo_name.lower()],
-                    lifecycle_state=ExperimentState.RUNNING,
-                    start_time=datetime.utcnow()
-                )
-                global_experiment_registry.create(experiment)
-                
-                AuditLogger.record(AuditEvent(event_name="EXPERIMENT_STARTED", component="TrainingOrchestrator", severity="INFO", payload={"experiment_id": exp_id}))
-                AuditLogger.record(AuditEvent(event_name="TRAINING_STARTED", component="TrainingOrchestrator", severity="INFO", payload={"algorithm": algo_name, "dataset": dataset_name}))
+                await AuditLogger.record(session, AuditEvent(event_name="EXPERIMENT_STARTED", component="TrainingOrchestrator", severity="INFO", payload={"experiment_id": experiment.id}))
+                await AuditLogger.record(session, AuditEvent(event_name="TRAINING_STARTED", component="TrainingOrchestrator", severity="INFO", payload={"algorithm": algo_name, "dataset": dataset_name}))
                 
                 start_time = time.time()
                 try:
                     # 1. Train
-                    model = trainer.train(X_train, y_train)
+                    ml_model = trainer.train(X_train, y_train)
                     train_duration = (time.time() - start_time) * 1000
                     
-                    AuditLogger.record(AuditEvent(event_name="TRAINING_FINISHED", component="TrainingOrchestrator", severity="INFO", payload={"algorithm": algo_name, "duration_ms": train_duration}))
+                    await AuditLogger.record(session, AuditEvent(event_name="TRAINING_FINISHED", component="TrainingOrchestrator", severity="INFO", payload={"algorithm": algo_name, "duration_ms": train_duration}))
                     
                     # 2. Evaluate
-                    metrics = self.evaluator.evaluate(model, X_test, y_test)
-                    AuditLogger.record(AuditEvent(event_name="EVALUATION_FINISHED", component="TrainingOrchestrator", severity="INFO", payload={"algorithm": algo_name, "accuracy": metrics.get("accuracy", 0)}))
+                    metrics = self.evaluator.evaluate(ml_model, X_test, y_test)
+                    await AuditLogger.record(session, AuditEvent(event_name="EVALUATION_FINISHED", component="TrainingOrchestrator", severity="INFO", payload={"algorithm": algo_name, "accuracy": metrics.get("accuracy", 0)}))
                     
                     # 3. Model Versioning & ID
-                    base_model_id = f"mdl_{dataset_name}_{algo_name.lower()}"
+                    # Check existing models for versioning
+                    existing_model = await model_repo.get_by_dataset_and_name(dataset_record.id, algo_name)
+                    version = 1
+                    if existing_model:
+                        version = existing_model.version + 1
                     
-                    existing_versions = [1]
-                    for m_id in self.registry.list_models():
-                        if m_id.startswith(base_model_id):
-                            m_meta = self.registry.get(m_id)
-                            try:
-                                v_num = int(m_meta.model_version.replace("v", ""))
-                                existing_versions.append(v_num + 1)
-                            except: pass
-                            
-                    next_v = max(existing_versions)
-                    version_str = f"v{next_v}"
-                    model_id = f"{base_model_id}_{version_str}"
+                    model_id_str = f"mdl_{dataset_name}_{algo_name.lower()}_v{version}"
                     
                     # 4. Save Artifact
-                    artifact_path, checksum = self.artifact_store.save(model, model_id, version_str)
-                    AuditLogger.record(AuditEvent(event_name="ARTIFACT_SAVED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id, "checksum": checksum}))
+                    artifact_path, checksum = self.artifact_store.save(ml_model, model_id_str, f"v{version}")
+                    await AuditLogger.record(session, AuditEvent(event_name="ARTIFACT_SAVED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str, "checksum": checksum}))
                     
                     # 5. Explainability & Baseline Profiling
                     from app.training.explainability import GlobalExplainer
                     from app.monitoring.drift.baseline import BaselineProfiler
                     
                     explainer = GlobalExplainer()
-                    feat_imp = explainer.compute_feature_importance(model, feature_names)
-                    shap_summ = explainer.compute_shap_summary(model, X_train)
+                    feat_imp = explainer.compute_feature_importance(ml_model, feature_names)
+                    shap_summ = explainer.compute_shap_summary(ml_model, X_train)
                     
                     baseline_profile = BaselineProfiler.compute_baseline(X_train, y_train)
-                    AuditLogger.record(AuditEvent(event_name="BASELINE_UPDATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id}))
+                    await AuditLogger.record(session, AuditEvent(event_name="BASELINE_UPDATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str}))
                     
                     if feat_imp:
-                        AuditLogger.record(AuditEvent(event_name="EXPLANATION_GENERATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id}))
+                        await AuditLogger.record(session, AuditEvent(event_name="EXPLANATION_GENERATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str}))
                     if shap_summ:
-                        AuditLogger.record(AuditEvent(event_name="SHAP_GENERATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id}))
+                        await AuditLogger.record(session, AuditEvent(event_name="SHAP_GENERATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str}))
                         
                     # 6. Register Model
-                    meta = ModelMetadata(
-                        model_id=model_id,
-                        model_version=version_str,
-                        algorithm=algo_name,
-                        target_column=target_col,
-                        feature_version="1.0.0",
-                        dataset_version=dataset_meta.version,
-                        hyperparameters=trainer.hyperparameters,
-                        metrics=metrics,
-                        artifact_path=artifact_path,
-                        artifact_checksum=checksum,
-                        dataset_size=len(X),
-                        feature_count=len(feature_names),
-                        feature_names=feature_names,
-                        feature_importance=feat_imp,
-                        shap_summary=shap_summ,
-                        baseline_profile=baseline_profile,
-                        split_config={"test_size": 0.2, "random_state": 42},
-                        training_duration_ms=train_duration,
-                        lifecycle_state=ModelLifecycleState.CANDIDATE
-                    )
-                    
-                    self.registry.register(meta)
+                    if existing_model:
+                        # Update existing
+                        meta = await model_repo.update(existing_model, {
+                            "version": version,
+                            "metrics": metrics,
+                            "hyperparameters": trainer.hyperparameters,
+                            "artifact_uri": artifact_path,
+                            "status": "CANDIDATE"
+                        })
+                    else:
+                        meta = await model_repo.create({
+                            "dataset_id": dataset_record.id,
+                            "name": algo_name,
+                            "version": version,
+                            "metrics": metrics,
+                            "hyperparameters": trainer.hyperparameters,
+                            "artifact_uri": artifact_path,
+                            "status": "CANDIDATE"
+                        })
+                        
                     models_trained.append(meta)
                     
                     # Complete Experiment
-                    global_experiment_registry.update(
-                        experiment_id=exp_id,
-                        lifecycle_state=ExperimentState.COMPLETED,
-                        end_time=datetime.utcnow(),
-                        metrics=metrics,
-                        artifact_path=artifact_path,
-                        model_version=version_str,
-                        training_time_ms=train_duration
-                    )
-                    AuditLogger.record(AuditEvent(event_name="EXPERIMENT_FINISHED", component="TrainingOrchestrator", severity="INFO", payload={"experiment_id": exp_id}))
-                    AuditLogger.record(AuditEvent(event_name="MODEL_REGISTERED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id}))
+                    await experiment_repo.update(experiment, {
+                        "status": "COMPLETED",
+                        "metrics": metrics,
+                        "model_id": meta.id,
+                        "end_time": datetime.utcnow()
+                    })
+                    await AuditLogger.record(session, AuditEvent(event_name="EXPERIMENT_FINISHED", component="TrainingOrchestrator", severity="INFO", payload={"experiment_id": experiment.id}))
+                    await AuditLogger.record(session, AuditEvent(event_name="MODEL_REGISTERED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": meta.id}))
                     
                 except Exception as e:
-                    global_experiment_registry.update(
-                        experiment_id=exp_id,
-                        lifecycle_state=ExperimentState.FAILED,
-                        end_time=datetime.utcnow(),
-                        status_message=str(e)
-                    )
-                    AuditLogger.record(AuditEvent(event_name="EXPERIMENT_FAILED", component="TrainingOrchestrator", severity="ERROR", payload={"experiment_id": exp_id}))
-                    AuditLogger.record(AuditEvent(event_name="TRAINING_FAILED", component="TrainingOrchestrator", severity="ERROR", payload={"algorithm": algo_name, "error": str(e)}))
+                    await experiment_repo.update(experiment, {
+                        "status": "FAILED",
+                        "end_time": datetime.utcnow()
+                    })
+                    await AuditLogger.record(session, AuditEvent(event_name="EXPERIMENT_FAILED", component="TrainingOrchestrator", severity="ERROR", payload={"experiment_id": experiment.id}))
+                    await AuditLogger.record(session, AuditEvent(event_name="TRAINING_FAILED", component="TrainingOrchestrator", severity="ERROR", payload={"algorithm": algo_name, "error": str(e)}))
                     logger.error(f"Failed to train {algo_name}: {e}")
                     
             # 6. Champion Selection & Promotion Rules
@@ -234,30 +197,33 @@ class TrainingOrchestrator:
                 best_acc = best_candidate.metrics.get('accuracy', 0)
                 
                 # Find current active champion for this dataset
-                current_champion = None
-                for m_id in self.registry.list_models():
-                    existing = self.registry.get(m_id)
-                    if existing.dataset_version == dataset_meta.version and existing.lifecycle_state == ModelLifecycleState.CHAMPION:
-                        current_champion = existing
-                        break
-                        
-                if current_champion:
-                    current_acc = current_champion.metrics.get('accuracy', 0)
+                current_champion_record = await champion_repo.get_by_dataset(dataset_record.id)
+                
+                if current_champion_record:
+                    # load model
+                    current_champion_model = await model_repo.get(current_champion_record.model_id)
+                    current_acc = current_champion_model.metrics.get('accuracy', 0) if current_champion_model else 0
+                    
                     if best_acc > current_acc:
-                        # Promote new, demote old
-                        self.registry.update_lifecycle_state(current_champion.model_id, ModelLifecycleState.ARCHIVED)
-                        self.registry.update_lifecycle_state(best_candidate.model_id, ModelLifecycleState.CHAMPION)
-                        AuditLogger.record(AuditEvent(event_name="CHAMPION_PROMOTED", component="TrainingOrchestrator", severity="INFO", payload={"new_champion": best_candidate.model_id, "accuracy": best_acc, "previous_champion": current_champion.model_id}))
-                        logger.info(f"Champion promoted: {best_candidate.model_id} outperformed {current_champion.model_id}")
+                        # Promote new
+                        await champion_repo.update(current_champion_record, {
+                            "model_id": best_candidate.id
+                        })
+                        await AuditLogger.record(session, AuditEvent(event_name="CHAMPION_PROMOTED", component="TrainingOrchestrator", severity="INFO", payload={"new_champion": best_candidate.id, "accuracy": best_acc, "previous_champion": current_champion_model.id if current_champion_model else None}))
+                        logger.info(f"Champion promoted: {best_candidate.id} outperformed old champion")
                     else:
-                        # Archive candidate
-                        self.registry.update_lifecycle_state(best_candidate.model_id, ModelLifecycleState.ARCHIVED)
-                        logger.info(f"Candidate {best_candidate.model_id} ({best_acc:.4f}) failed to beat champion {current_champion.model_id} ({current_acc:.4f}). Archived.")
+                        logger.info(f"Candidate {best_candidate.id} ({best_acc:.4f}) failed to beat champion ({current_acc:.4f}). Archived.")
                 else:
                     # First time training on this dataset version
-                    self.registry.update_lifecycle_state(best_candidate.model_id, ModelLifecycleState.CHAMPION)
-                    AuditLogger.record(AuditEvent(event_name="CHAMPION_PROMOTED", component="TrainingOrchestrator", severity="INFO", payload={"new_champion": best_candidate.model_id, "accuracy": best_acc}))
-                    logger.info(f"Initial champion promoted: {best_candidate.model_id}")
+                    await champion_repo.create({
+                        "dataset_id": dataset_record.id,
+                        "model_id": best_candidate.id
+                    })
+                    await AuditLogger.record(session, AuditEvent(event_name="CHAMPION_PROMOTED", component="TrainingOrchestrator", severity="INFO", payload={"new_champion": best_candidate.id, "accuracy": best_acc}))
+                    logger.info(f"Initial champion promoted: {best_candidate.id}")
+                    
+            await session.commit()
 
         except Exception as e:
+            await session.rollback()
             logger.error(f"Training orchestration failed for dataset {dataset_name}: {e}")

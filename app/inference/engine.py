@@ -7,16 +7,15 @@ import uuid
 
 from app.utils.logger import get_logger
 from app.inference.registry import InferenceModelRegistry
-from app.inference.loader import RegistryModelLoader
 from app.inference.predictor import ModelPredictor
 from app.inference.exceptions import InferenceError, PredictionError
 from app.inference.request import PredictionRequest
 from app.inference.response import PredictionResponse
 from app.inference.validator import RequestValidator
 from app.training.artifacts import LocalArtifactStore
-from app.training.registry import LocalModelRegistry
-from app.training.metadata import ModelLifecycleState
 from app.monitoring.audit import AuditLogger, AuditEvent
+from app.storage.database import AsyncSessionLocal
+from app.storage.repositories.core import ChampionModelRepository, ModelRepository
 
 logger = get_logger(__name__)
 
@@ -25,78 +24,116 @@ class PredictionEngine:
     Centralized Inference Service.
     Loads active models into memory, handles batching/CSV, routing, and fallbacks.
     """
-    def __init__(self, training_registry: LocalModelRegistry, artifact_store: LocalArtifactStore):
-        self.training_registry = training_registry
+    def __init__(self, artifact_store: LocalArtifactStore):
         self.artifact_store = artifact_store
         
-        self.loader = RegistryModelLoader(self.training_registry, self.artifact_store)
         self.routing_registry = InferenceModelRegistry()
         self.validator = RequestValidator()
         
-        # In-memory warmed predictors
         self.predictors: Dict[str, ModelPredictor] = {}
         
-        # Engine stats for Management API
         self.stats = {
             "prediction_count": 0,
             "total_latency_ms": 0.0,
             "last_prediction_time": None
         }
 
-    def start(self):
-        """Warms up the engine by loading CHAMPION/CHALLENGER models into memory."""
+    async def start(self):
+        """Warms up the engine by loading CHAMPION models from DB into memory."""
         logger.info("Initializing Prediction Engine.")
-        models = self.training_registry.list_models()
         
         champion_meta = None
-        challenger_meta = None
         
-        for mid in models:
-            meta = self.training_registry.get(mid)
-            if meta.lifecycle_state == ModelLifecycleState.CHAMPION:
-                if not champion_meta or meta.training_timestamp > champion_meta.training_timestamp:
-                    champion_meta = meta
-            elif meta.lifecycle_state == ModelLifecycleState.CHALLENGER:
-                if not challenger_meta or meta.training_timestamp > challenger_meta.training_timestamp:
-                    challenger_meta = meta
+        async with AsyncSessionLocal() as session:
+            champion_repo = ChampionModelRepository(session)
+            model_repo = ModelRepository(session)
+            
+            # For simplicity, we just load the first champion model
+            # In a real system we'd load champions per dataset
+            # Here we just load all champions
+            from sqlalchemy.future import select
+            from app.storage.models import ChampionModel
+            result = await session.execute(select(ChampionModel))
+            champions = result.scalars().all()
+            
+            active_models = []
+            for c in champions:
+                model = await model_repo.get(c.model_id)
+                if model:
+                    active_models.append(model)
+                    if not champion_meta:
+                        champion_meta = model
+                        
+            # Actually, `ModelPredictor` needs the loaded ML artifact.
+            for meta in active_models:
+                try:
+                    # In a real system, ModelPredictor would use ArtifactStore to load from artifact_uri
+                    import joblib
+                    # Assume meta.artifact_uri is the local path (e.g. from artifact_store.save)
+                    # For now we'll mock the predictor loading to just use the artifact_uri if possible
+                    # or we pass artifact_store to predictor
+                    predictor = ModelPredictor(
+                        model_id=meta.id,
+                        version=f"v{meta.version}",
+                        loader=None, # We'll refactor predictor next
+                        validator=self.validator,
+                        training_registry=None,
+                        model_alias=meta.id
+                    )
+                    # Override predictor's model with artifact store load
+                    # Predictor constructor currently expects `loader.load(model_id)`
+                    # We'll fix `ModelPredictor` next
+                    predictor.model = self.artifact_store.load(meta.id, f"v{meta.version}")
                     
-        active_models = [m for m in [champion_meta, challenger_meta] if m is not None]
-                
-        for meta in active_models:
-            try:
-                predictor = ModelPredictor(
-                    model_id=meta.model_id,
-                    version=meta.model_version,
-                    loader=self.loader,
-                    validator=self.validator,
-                    training_registry=self.training_registry,
-                    model_alias=meta.model_id
-                )
-                self.predictors[meta.model_id] = predictor
-                self.routing_registry.set_alias(meta.model_id, meta.model_id, meta.model_version)
-                AuditLogger.record(AuditEvent(event_name="MODEL_LOADED", component="PredictionEngine", severity="INFO", payload={"model_id": meta.model_id, "state": meta.lifecycle_state.value}))
-            except Exception as e:
-                logger.error(f"Failed to load model {meta.model_id}: {e}")
-                
-        from app.inference.routing import global_traffic_router
-        global_traffic_router.configure(
-            champion_id=champion_meta.model_id if champion_meta else None,
-            challenger_id=challenger_meta.model_id if challenger_meta else None,
-            champion_weight=1.0 # Default 100% to Champion initially
-        )
-        
-        # Bind Default Alias to Champion
-        if champion_meta:
-            self.routing_registry.set_default(champion_meta.model_id, champion_meta.model_version)
-        else:
-            logger.warning("No CHAMPION model found during Prediction Engine startup.")
+                    self.predictors[meta.id] = predictor
+                    self.routing_registry.set_alias(meta.id, meta.id, f"v{meta.version}")
+                    
+                    # Also need feature names and metadata
+                    from app.training.metadata import ModelMetadata
+                    # Construct a dummy metadata just for Predictor usage
+                    predictor.metadata = ModelMetadata(
+                        model_id=meta.id,
+                        model_version=f"v{meta.version}",
+                        algorithm=meta.name,
+                        target_column="target",
+                        feature_version="1.0.0",
+                        dataset_version=meta.dataset.name if meta.dataset else "unknown",
+                        hyperparameters=meta.hyperparameters,
+                        metrics=meta.metrics,
+                        artifact_path=meta.artifact_uri,
+                        artifact_checksum="",
+                        dataset_size=0,
+                        feature_count=0,
+                        feature_names=[], # Predictor doesn't strictly use this unless it validates
+                        feature_importance={},
+                        shap_summary={},
+                        baseline_profile={},
+                        split_config={},
+                        training_duration_ms=0,
+                        lifecycle_state="CHAMPION"
+                    )
+                    
+                    await AuditLogger.record(session, AuditEvent(event_name="MODEL_LOADED", component="PredictionEngine", severity="INFO", payload={"model_id": meta.id, "state": "CHAMPION"}))
+                except Exception as e:
+                    logger.error(f"Failed to load model {meta.id}: {e}")
+                    
+            from app.inference.routing import global_traffic_router
+            global_traffic_router.configure(
+                champion_id=champion_meta.id if champion_meta else None,
+                challenger_id=None,
+                champion_weight=1.0 
+            )
+            
+            if champion_meta:
+                self.routing_registry.set_default(champion_meta.id, f"v{champion_meta.version}")
+            else:
+                logger.warning("No CHAMPION model found during Prediction Engine startup.")
 
-    def _execute_predict(self, request: PredictionRequest, alias: str = "default") -> PredictionResponse:
+    async def _execute_predict(self, request: PredictionRequest, alias: str = "default") -> PredictionResponse:
         """Core prediction logic with fallback mechanism."""
         try:
             from app.inference.routing import global_traffic_router
             
-            # Dynamic A/B routing if "default" is used
             if alias == "default":
                 selected_model_id = global_traffic_router.select_model()
                 if not selected_model_id:
@@ -110,13 +147,14 @@ class PredictionEngine:
             if not predictor:
                 raise InferenceError(f"Predictor for {model_id} is not loaded in memory.")
                 
-            AuditLogger.record(AuditEvent(event_name="PREDICTION_STARTED", component="PredictionEngine", severity="INFO", payload={"request_id": request.request_id}))
+            async with AsyncSessionLocal() as session:
+                await AuditLogger.record(session, AuditEvent(event_name="PREDICTION_STARTED", component="PredictionEngine", severity="INFO", payload={"request_id": request.request_id}))
             
             response = predictor.predict(request)
             
-            AuditLogger.record(AuditEvent(event_name="PREDICTION_FINISHED", component="PredictionEngine", severity="INFO", payload={"request_id": request.request_id, "latency_ms": response.latency_ms}))
+            async with AsyncSessionLocal() as session:
+                await AuditLogger.record(session, AuditEvent(event_name="PREDICTION_FINISHED", component="PredictionEngine", severity="INFO", payload={"request_id": request.request_id, "latency_ms": response.latency_ms}))
             
-            # Update stats
             self.stats["prediction_count"] += 1
             self.stats["total_latency_ms"] += response.latency_ms
             self.stats["last_prediction_time"] = datetime.utcnow().isoformat()
@@ -125,9 +163,9 @@ class PredictionEngine:
             
         except Exception as e:
             logger.error(f"Prediction failed on primary path: {e}")
-            AuditLogger.record(AuditEvent(event_name="PREDICTION_FAILED", component="PredictionEngine", severity="ERROR", payload={"error": str(e), "request_id": request.request_id}))
+            async with AsyncSessionLocal() as session:
+                await AuditLogger.record(session, AuditEvent(event_name="PREDICTION_FAILED", component="PredictionEngine", severity="ERROR", payload={"error": str(e), "request_id": request.request_id}))
             
-            # Fallback logic: Use any other available loaded predictor
             fallback_predictor = None
             for pid, p in self.predictors.items():
                 if pid != model_id:
@@ -136,7 +174,8 @@ class PredictionEngine:
                     
             if fallback_predictor:
                 logger.warning(f"Initiating fallback to {fallback_predictor.model_id}")
-                AuditLogger.record(AuditEvent(event_name="FALLBACK_ACTIVATED", component="PredictionEngine", severity="WARNING", payload={"fallback_model_id": fallback_predictor.model_id}))
+                async with AsyncSessionLocal() as session:
+                    await AuditLogger.record(session, AuditEvent(event_name="FALLBACK_ACTIVATED", component="PredictionEngine", severity="WARNING", payload={"fallback_model_id": fallback_predictor.model_id}))
                 try:
                     response = fallback_predictor.predict(request)
                     self.stats["prediction_count"] += 1
@@ -146,17 +185,17 @@ class PredictionEngine:
                     
             raise PredictionError("Prediction failed and no fallback models are available.") from e
 
-    def predict_single(self, features: Dict[str, Any], entity_id: str = None, alias: str = "default") -> PredictionResponse:
+    async def predict_single(self, features: Dict[str, Any], entity_id: str = None, alias: str = "default") -> PredictionResponse:
         req = PredictionRequest(request_id=str(uuid.uuid4()), entity_id=entity_id or "anon", features=features)
-        return self._execute_predict(req, alias)
+        return await self._execute_predict(req, alias)
 
-    def predict_batch(self, batch_features: List[Dict[str, Any]], alias: str = "default") -> List[PredictionResponse]:
+    async def predict_batch(self, batch_features: List[Dict[str, Any]], alias: str = "default") -> List[PredictionResponse]:
         responses = []
         for features in batch_features:
-            responses.append(self.predict_single(features, alias=alias))
+            responses.append(await self.predict_single(features, alias=alias))
         return responses
 
-    def predict_csv(self, csv_data: str, alias: str = "default") -> List[PredictionResponse]:
+    async def predict_csv(self, csv_data: str, alias: str = "default") -> List[PredictionResponse]:
         df = pd.read_csv(StringIO(csv_data))
         batch = df.to_dict(orient="records")
-        return self.predict_batch(batch, alias=alias)
+        return await self.predict_batch(batch, alias=alias)

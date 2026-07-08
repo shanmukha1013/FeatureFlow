@@ -46,10 +46,7 @@ from app.inference.engine import PredictionEngine
 # GLOBAL PREDICTION ENGINE
 # Centralizes model loading, routing, and batching logic.
 # ---------------------------------------------------------
-_prediction_engine = PredictionEngine(
-    training_registry=_training_registry,
-    artifact_store=_artifact_store
-)
+_prediction_engine = PredictionEngine(artifact_store=_artifact_store)
 
 def get_prediction_engine() -> PredictionEngine:
     """Dependency injector for the unified prediction engine."""

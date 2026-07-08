@@ -4,9 +4,14 @@ Provides high-level platform and system overview data.
 import sys
 import platform
 import fastapi
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from datetime import datetime
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy import func
 
+from app.storage.database import get_db
+from app.storage.models import Dataset, Feature, Model, Experiment
 from app.serving.api.v1.management.schemas.responses import (
     PlatformOverviewSchema, SystemInfoSchema, StatisticsSchema, AboutSchema, ConfigSchema
 )
@@ -16,34 +21,21 @@ from app.serving.config import serving_config
 router = APIRouter()
 
 @router.get("/platform", response_model=PlatformOverviewSchema)
-def get_platform_overview():
+async def get_platform_overview(session: AsyncSession = Depends(get_db)):
     health = HealthMonitor.check_health()
     
-    # Compute from registries
-    num_models = 0
-    num_features = 0
-    num_datasets = 0
-    num_pipelines = 0
+    # Compute from database
+    result_datasets = await session.execute(select(func.count(Dataset.id)))
+    num_datasets = result_datasets.scalar_one()
     
-    try:
-        from app.serving.dependencies import _training_registry
-        num_models = len(_training_registry.list_models())
-    except Exception: pass
+    result_features = await session.execute(select(func.count(Feature.id)))
+    num_features = result_features.scalar_one()
     
-    try:
-        from app.features.registry import global_feature_registry
-        num_features = len(global_feature_registry.list_features())
-    except Exception: pass
+    result_models = await session.execute(select(func.count(Model.id)))
+    num_models = result_models.scalar_one()
     
-    try:
-        from app.data.dataset_registry import global_dataset_registry
-        num_datasets = len(global_dataset_registry.list_datasets())
-    except Exception: pass
-    
-    try:
-        from app.pipelines.pipeline import _pipeline_history
-        num_pipelines = len(_pipeline_history)
-    except Exception: pass
+    result_experiments = await session.execute(select(func.count(Experiment.id)))
+    num_pipelines = result_experiments.scalar_one()
 
     return PlatformOverviewSchema(
         platform_version=serving_config.platform_version,
@@ -52,26 +44,26 @@ def get_platform_overview():
         registered_features=num_features,
         registered_datasets=num_datasets,
         pipeline_count=num_pipelines,
-        training_jobs=num_models, # Roughly matches for now
+        training_jobs=num_pipelines,
         serving_status="ACTIVE",
         monitoring_status="ACTIVE",
         inference_status="ACTIVE"
     )
 
 @router.get("/system", response_model=SystemInfoSchema)
-def get_system_info():
+async def get_system_info():
     return SystemInfoSchema(
         python_version=sys.version.split(" ")[0],
         operating_system=platform.system(),
         framework_version=fastapi.__version__,
-        storage_backend="local",
-        monitoring_backend="local",
+        storage_backend="postgresql",
+        monitoring_backend="postgresql",
         inference_backend="sklearn",
         training_backend="sklearn"
     )
 
 @router.get("/statistics", response_model=StatisticsSchema)
-def get_statistics():
+async def get_statistics(session: AsyncSession = Depends(get_db)):
     total_preds = 0
     avg_latency = 0.0
     val_failures = 0
@@ -79,7 +71,6 @@ def get_statistics():
     try:
         from app.monitoring.metrics import _backend
         if hasattr(_backend, "counters"):
-            # The exact counter keys depend on the strings used in monitoring interceptors
             total_preds = _backend.counters.get("http_requests_total_{'status': '200'}", 0)
             val_failures = _backend.counters.get("http_requests_total_{'status': '422'}", 0)
             
@@ -90,17 +81,11 @@ def get_statistics():
     except Exception:
         pass
         
-    num_models = 0
-    try:
-        from app.serving.dependencies import _training_registry
-        num_models = len(_training_registry.list_models())
-    except Exception: pass
+    result_models = await session.execute(select(func.count(Model.id)))
+    num_models = result_models.scalar_one()
     
-    num_pipelines = 0
-    try:
-        from app.pipelines.pipeline import _pipeline_history
-        num_pipelines = len(_pipeline_history)
-    except Exception: pass
+    result_pipelines = await session.execute(select(func.count(Experiment.id)))
+    num_pipelines = result_pipelines.scalar_one()
     
     return StatisticsSchema(
         total_predictions=total_preds,
@@ -112,10 +97,10 @@ def get_statistics():
     )
 
 @router.get("/about", response_model=AboutSchema)
-def get_about():
+async def get_about():
     return AboutSchema(
         platform_name="FeatureFlow",
-        description="Production ML Platform",
+        description="Production ML Platform (PostgreSQL Backed)",
         version=serving_config.platform_version,
         author="ML Platform Team",
         license="Internal",
@@ -124,10 +109,10 @@ def get_about():
     )
 
 @router.get("/config", response_model=ConfigSchema)
-def get_config():
+async def get_config():
     return ConfigSchema(
-        storage_backend="local",
-        monitoring_backend="local",
+        storage_backend="postgresql",
+        monitoring_backend="postgresql",
         training_backend="sklearn",
         inference_backend="sklearn",
         serving_version=serving_config.api_version,

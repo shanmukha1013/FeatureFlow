@@ -1,70 +1,76 @@
 """
 Executes feature computation workflows.
-
-Given a feature registry and a sequence of requested feature names, the Transformer 
-iterates through the features, executes their safe call chains, and bundles the 
-resulting vectors into a finalized, decoupled dataset.
 """
 import time
 import pandas as pd
 from typing import List, Dict
 
-from app.features.registry import FeatureRegistry
 from app.features.exceptions import FeatureTransformationError
 from app.utils.logger import get_logger
+from app.storage.models import Feature
+from app.features.engine import FEATURE_MAPPINGS
+from app.features.metadata import FeatureMetadata
 
 logger = get_logger(__name__)
 
 class FeatureTransformer:
     """
     Coordinates the execution of multiple feature transformations over raw datasets.
-    Provides detailed transformation auditing via structured logging.
     """
-    def __init__(self, registry: FeatureRegistry) -> None:
-        """
-        Args:
-            registry: A configured FeatureRegistry containing the definitions 
-                      to execute.
-        """
-        self.registry = registry
+    def __init__(self) -> None:
+        self.class_map = {}
+        for category, mappings in FEATURE_MAPPINGS.items():
+            for mapping in mappings:
+                self.class_map[mapping['transformation']] = mapping['class']
 
-    def transform(self, df: pd.DataFrame, feature_names: List[str]) -> pd.DataFrame:
-        """
-        Computes the requested features using the provided DataFrame.
-        
-        Args:
-            df: Validated, cleaned Pandas DataFrame acting as the root context.
-            feature_names: Ordered list of feature names to extract from the registry.
-            
-        Returns:
-            A new Pandas DataFrame containing *only* the computed feature columns.
-            
-        Raises:
-            FeatureTransformationError: If any feature fails its computation lifecycle.
-        """
+    def transform(self, df: pd.DataFrame, features: List[Feature]) -> pd.DataFrame:
         if df is None or df.empty:
             raise FeatureTransformationError("Transformer requires a populated DataFrame context.")
             
-        if not feature_names:
+        if not features:
             logger.warning("Transformation requested with an empty feature list. Returning empty DataFrame.")
             return pd.DataFrame()
 
         start_time = time.perf_counter()
-        logger.info(f"Initiating transformation sequence for {len(feature_names)} features.")
+        logger.info(f"Initiating transformation sequence for {len(features)} features.")
         
         transformed_data: Dict[str, pd.Series] = {}
         
-        for name in feature_names:
-            feature = self.registry.get(name)
+        for feature_record in features:
+            name = feature_record.name
             try:
                 feature_start = time.perf_counter()
                 
-                # The BaseFeature.__call__ handles validation and logging transparently
-                series: pd.Series = feature(df)
+                col_name = None
+                for col in df.columns:
+                    if f"_{col}_" in name:
+                        col_name = col
+                        break
+                if not col_name:
+                    col_name = df.columns[0]
+                    
+                meta = FeatureMetadata(
+                    feature_id=feature_record.id,
+                    name=feature_record.name,
+                    source_dataset=feature_record.dataset.name if feature_record.dataset else "",
+                    source_columns=[col_name],
+                    transformation=feature_record.transformation,
+                    data_type=feature_record.dtype,
+                    feature_type="Numeric", # Default
+                    description="Auto-generated feature",
+                    version="1.0.0",
+                    owner="system"
+                )
                 
-                # Enforce identical naming convention to the metadata definition
-                series.name = feature.name
-                transformed_data[feature.name] = series
+                feature_class = self.class_map.get(feature_record.transformation)
+                if not feature_class:
+                    raise FeatureTransformationError(f"Unknown transformation: {feature_record.transformation}")
+                    
+                feature_instance = feature_class(metadata=meta)
+                series: pd.Series = feature_instance(df)
+                
+                series.name = feature_record.name
+                transformed_data[feature_record.name] = series
                 
                 feature_duration = (time.perf_counter() - feature_start) * 1000
                 logger.debug(f"Audit: Feature '{name}' computed successfully in {feature_duration:.2f}ms.")
@@ -73,13 +79,12 @@ class FeatureTransformer:
                 logger.error(error_msg)
                 raise FeatureTransformationError(error_msg) from e
                 
-        # Finalized feature union
         result_df: pd.DataFrame = pd.DataFrame(transformed_data)
         
         total_duration = (time.perf_counter() - start_time) * 1000
         logger.info(
             f"Transformation sequence finalized. "
-            f"Audited {len(feature_names)} features in {total_duration:.2f}ms."
+            f"Audited {len(features)} features in {total_duration:.2f}ms."
         )
         
         return result_df

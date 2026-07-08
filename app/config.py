@@ -5,7 +5,15 @@ Provides a strict, immutable contract for application settings.
 Loaded once per execution context to avoid hardcoded paths and values.
 """
 import os
+import sys
 from dataclasses import dataclass
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 @dataclass(frozen=True)
 class Settings:
@@ -19,6 +27,18 @@ class Settings:
     environment: str = os.getenv("ENVIRONMENT", "development")
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     data_dir: str = os.getenv("DATA_DIR", "./datasets")
+    
+    # Database Configuration
+    database_url: str = os.getenv("DATABASE_URL")
+
+    def __post_init__(self):
+        if not self.database_url:
+            logger.error("CRITICAL: DATABASE_URL environment variable is missing!")
+            sys.exit(1)
+        
+        # Ensure we use asyncpg for PostgreSQL URLs
+        if self.database_url.startswith("postgresql://"):
+            object.__setattr__(self, 'database_url', self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1))
 
     @property
     def is_production(self) -> bool:

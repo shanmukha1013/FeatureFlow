@@ -43,14 +43,18 @@ def create_app() -> FastAPI:
     # 3. Mount Routers
     app.include_router(v1_router, prefix=f"/api/{serving_config.api_version}")
 
+    from app.storage.database import init_db
     import threading
     from app.data.discovery import DatasetDiscovery
     from app.serving.dependencies import _prediction_engine
     
     @app.on_event("startup")
-    def startup_event():
+    async def startup_event():
+        # Initialize Database connection and create tables
+        await init_db()
+        
         # Start Prediction Engine immediately to warm caches
-        _prediction_engine.start()
+        await _prediction_engine.start()
         
         def run_discovery():
             discovery = DatasetDiscovery()

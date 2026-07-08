@@ -1,8 +1,14 @@
 """
 Exposes read-only access to platform registries.
 """
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Any, List
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy import desc
+
+from app.storage.database import get_db
+from app.storage.models import Dataset, Feature, Model, Experiment, ChampionModel, AuditLog
 from app.serving.api.v1.management.schemas.pagination import PaginatedResponse
 
 router = APIRouter()
@@ -16,85 +22,119 @@ def paginate(items: List[Any], page: int, size: int) -> PaginatedResponse[Any]:
     return PaginatedResponse(items=sliced, total=total, page=page, size=size, has_next=has_next)
 
 @router.get("/datasets", response_model=PaginatedResponse[Any])
-def get_datasets(page: int = Query(1, ge=1), size: int = Query(50, ge=1, le=100)):
+async def get_datasets(
+    page: int = Query(1, ge=1), 
+    size: int = Query(50, ge=1, le=100),
+    session: AsyncSession = Depends(get_db)
+):
+    result = await session.execute(select(Dataset).order_by(desc(Dataset.created_at)))
+    datasets = result.scalars().all()
     items = []
-    try:
-        from app.data.dataset_registry import global_dataset_registry
-        datasets = global_dataset_registry.list_datasets()
-        items = [d.__dict__ for d in datasets]
-    except Exception:
-        pass
+    for d in datasets:
+        items.append({
+            "id": d.id,
+            "name": d.name,
+            "description": d.description,
+            "status": d.status,
+            "version": d.version,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "inferred_dtypes": d.inferred_dtypes
+        })
     return paginate(items, page, size)
 
 @router.get("/features", response_model=PaginatedResponse[Any])
-def get_features(
+async def get_features(
     page: int = Query(1, ge=1), 
     size: int = Query(50, ge=1, le=100),
     search: str = None,
     dataset: str = None,
     sort_by: str = "created_at",
-    sort_desc: bool = True
+    sort_desc: bool = True,
+    session: AsyncSession = Depends(get_db)
 ):
+    from sqlalchemy.orm import selectinload
+    
+    query = select(Feature).options(selectinload(Feature.dataset))
+    if search:
+        query = query.filter(Feature.name.ilike(f"%{search}%"))
+    
+    # Simple sort assuming valid column
+    if sort_desc:
+        query = query.order_by(desc(getattr(Feature, sort_by, Feature.created_at)))
+    else:
+        query = query.order_by(getattr(Feature, sort_by, Feature.created_at))
+
+    result = await session.execute(query)
+    features = result.scalars().all()
+    
     items = []
-    try:
-        from app.features.registry import global_feature_registry
-        for name in global_feature_registry.list_features():
-            feat = global_feature_registry.get(name)
-            if hasattr(feat, "metadata"):
-                meta_dict = feat.metadata.__dict__
-                
-                # Filtering
-                if search and search.lower() not in meta_dict.get("name", "").lower():
-                    continue
-                if dataset and dataset.lower() != meta_dict.get("source_dataset", "").lower():
-                    continue
-                    
-                items.append(meta_dict)
-                
-        # Sorting
-        if sort_by in items[0] if items else False:
-            items.sort(key=lambda x: x.get(sort_by, ""), reverse=sort_desc)
+    for f in features:
+        # Resolve dataset name manually if dataset filter is active
+        # The schema uses backref 'dataset'
+        ds_name = f.dataset.name if f.dataset else ""
+        if dataset and dataset.lower() != ds_name.lower():
+            continue
             
-    except Exception:
-        pass
+        items.append({
+            "id": f.id,
+            "name": f.name,
+            "dtype": f.dtype,
+            "transformation": f.transformation,
+            "status": f.status,
+            "version": f.version,
+            "source_dataset": ds_name,
+            "created_at": f.created_at.isoformat() if f.created_at else None
+        })
+        
     return paginate(items, page, size)
 
 @router.get("/models", response_model=PaginatedResponse[Any])
-def get_models(
+async def get_models(
     page: int = Query(1, ge=1), 
     size: int = Query(50, ge=1, le=100), 
     status: str = None,
     search: str = None,
     dataset: str = None,
-    sort_by: str = "training_timestamp",
-    sort_desc: bool = True
+    sort_by: str = "created_at",
+    sort_desc: bool = True,
+    session: AsyncSession = Depends(get_db)
 ):
+    from sqlalchemy.orm import selectinload
+    query = select(Model).options(selectinload(Model.dataset))
+    if status:
+        query = query.filter(Model.status == status)
+    if search:
+        query = query.filter(Model.name.ilike(f"%{search}%"))
+        
+    if sort_desc:
+        query = query.order_by(desc(getattr(Model, sort_by, Model.created_at)))
+    else:
+        query = query.order_by(getattr(Model, sort_by, Model.created_at))
+
+    result = await session.execute(query)
+    models = result.scalars().all()
+    
     items = []
-    try:
-        from app.serving.dependencies import _training_registry
-        model_ids = _training_registry.list_models()
-        for mid in model_ids:
-            meta = _training_registry.get(mid)
-            meta_dict = meta.to_dict()
+    for m in models:
+        ds_name = m.dataset.name if m.dataset else ""
+        if dataset and dataset.lower() != ds_name.lower():
+            continue
             
-            if status and getattr(meta, "lifecycle_state", None) != status:
-                continue
-            if search and search.lower() not in meta_dict.get("algorithm", "").lower() and search.lower() not in mid.lower():
-                continue
-            if dataset and dataset.lower() != meta_dict.get("dataset_version", "").lower():
-                continue
-                
-            items.append(meta_dict)
-            
-        if sort_by in items[0] if items else False:
-            items.sort(key=lambda x: x.get(sort_by, ""), reverse=sort_desc)
-            
-    except Exception:
-        pass
+        items.append({
+            "id": m.id,
+            "name": m.name,
+            "version": m.version,
+            "status": m.status,
+            "metrics": m.metrics,
+            "hyperparameters": m.hyperparameters,
+            "dataset_version": ds_name,
+            "created_at": m.created_at.isoformat() if m.created_at else None
+        })
+        
     return paginate(items, page, size)
 
 @router.get("/inference")
-def get_inference_stats():
+async def get_inference_stats():
     from app.serving.dependencies import _prediction_engine
     
     loaded_models = []
@@ -102,8 +142,8 @@ def get_inference_stats():
         loaded_models.append({
             "model_id": model_id,
             "version": predictor.version,
-            "algorithm": predictor.metadata.algorithm,
-            "dataset": predictor.metadata.dataset_version
+            "algorithm": predictor.metadata.algorithm if predictor.metadata else "Unknown",
+            "dataset": predictor.metadata.dataset_version if predictor.metadata else "Unknown"
         })
         
     return {
@@ -115,7 +155,7 @@ def get_inference_stats():
     }
 
 @router.get("/experiments", response_model=PaginatedResponse[Any])
-def get_experiments(
+async def get_experiments(
     page: int = Query(1, ge=1), 
     size: int = Query(50, ge=1, le=100),
     dataset: str = None,
@@ -123,86 +163,121 @@ def get_experiments(
     status: str = None,
     tag: str = None,
     sort_by: str = "start_time",
-    sort_desc: bool = True
+    sort_desc: bool = True,
+    session: AsyncSession = Depends(get_db)
 ):
+    from sqlalchemy.orm import selectinload
+    query = select(Experiment).options(selectinload(Experiment.dataset))
+    if algorithm:
+        query = query.filter(Experiment.algorithm == algorithm)
+    if status:
+        query = query.filter(Experiment.status == status)
+        
+    if sort_desc:
+        query = query.order_by(desc(getattr(Experiment, sort_by, Experiment.start_time)))
+    else:
+        query = query.order_by(getattr(Experiment, sort_by, Experiment.start_time))
+
+    result = await session.execute(query)
+    exps = result.scalars().all()
+    
     items = []
-    try:
-        from app.training.experiments.registry import global_experiment_registry
-        exps = global_experiment_registry.list_experiments()
-        for e in exps:
-            d = e.to_dict()
-            if dataset and d.get("dataset", "").lower() != dataset.lower(): continue
-            if algorithm and d.get("algorithm", "").lower() != algorithm.lower(): continue
-            if status and d.get("lifecycle_state", "").lower() != status.lower(): continue
-            if tag and tag.lower() not in [t.lower() for t in d.get("tags", [])]: continue
-            items.append(d)
-            
-        if items and sort_by in items[0]:
-            items.sort(key=lambda x: x.get(sort_by, ""), reverse=sort_desc)
-    except Exception: pass
+    for e in exps:
+        ds_name = e.dataset.name if e.dataset else ""
+        if dataset and dataset.lower() != ds_name.lower():
+            continue
+        
+        items.append({
+            "id": e.id,
+            "name": e.name,
+            "algorithm": e.algorithm,
+            "status": e.status,
+            "hyperparameters": e.hyperparameters,
+            "metrics": e.metrics,
+            "dataset": ds_name,
+            "start_time": e.start_time.isoformat() if e.start_time else None,
+            "end_time": e.end_time.isoformat() if e.end_time else None,
+        })
+        
     return paginate(items, page, size)
 
 @router.get("/experiments/compare")
-def compare_experiments(ids: str = Query(..., description="Comma separated experiment IDs")):
-    from app.training.experiments.registry import global_experiment_registry
+async def compare_experiments(ids: str = Query(..., description="Comma separated experiment IDs"), session: AsyncSession = Depends(get_db)):
     from app.monitoring.audit import AuditLogger, AuditEvent
     exp_ids = [e.strip() for e in ids.split(",") if e.strip()]
-    res = global_experiment_registry.compare(exp_ids)
-    AuditLogger.record(AuditEvent(event_name="EXPERIMENT_COMPARED", component="ManagementAPI", severity="INFO", payload={"experiment_ids": exp_ids}))
+    
+    result = await session.execute(select(Experiment).filter(Experiment.id.in_(exp_ids)))
+    exps = result.scalars().all()
+    
+    res = {}
+    for e in exps:
+        res[e.id] = {
+            "name": e.name,
+            "algorithm": e.algorithm,
+            "metrics": e.metrics,
+            "hyperparameters": e.hyperparameters
+        }
+        
+    await AuditLogger.record(session, AuditEvent(event_name="EXPERIMENT_COMPARED", component="ManagementAPI", severity="INFO", payload={"experiment_ids": exp_ids}))
     return res
 
 @router.get("/experiments/{id}")
-def get_experiment(id: str):
-    from app.training.experiments.registry import global_experiment_registry
-    from fastapi import HTTPException
-    try:
-        return global_experiment_registry.get(id).to_dict()
-    except ValueError:
+async def get_experiment(id: str, session: AsyncSession = Depends(get_db)):
+    result = await session.execute(select(Experiment).filter(Experiment.id == id))
+    exp = result.scalars().first()
+    if not exp:
         raise HTTPException(status_code=404, detail="Experiment not found")
+        
+    return {
+        "id": exp.id,
+        "name": exp.name,
+        "algorithm": exp.algorithm,
+        "status": exp.status,
+        "hyperparameters": exp.hyperparameters,
+        "metrics": exp.metrics,
+        "dataset": exp.dataset.name if exp.dataset else "",
+        "start_time": exp.start_time.isoformat() if exp.start_time else None,
+        "end_time": exp.end_time.isoformat() if exp.end_time else None,
+    }
 
 @router.get("/models/{id}/importance")
-def get_model_importance(id: str):
-    from app.serving.dependencies import _training_registry
-    from fastapi import HTTPException
-    try:
-        meta = _training_registry.get(id)
-        return {"model_id": id, "feature_importance": meta.feature_importance or {}}
-    except Exception:
+async def get_model_importance(id: str, session: AsyncSession = Depends(get_db)):
+    result = await session.execute(select(Model).filter(Model.id == id))
+    model = result.scalars().first()
+    if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+    
+    # Since feature importance is not stored directly on Model right now (it's in an artifact or metadata)
+    # We will return empty for now, or fetch from Model if we add it. 
+    # For now, it returns empty dict as placeholder.
+    return {"model_id": id, "feature_importance": {}}
 
 @router.get("/models/{id}/explanation")
-def get_model_explanation(id: str):
-    from app.serving.dependencies import _training_registry
-    from fastapi import HTTPException
-    try:
-        meta = _training_registry.get(id)
-        return {"model_id": id, "shap_summary": meta.shap_summary or {}}
-    except Exception:
+async def get_model_explanation(id: str, session: AsyncSession = Depends(get_db)):
+    result = await session.execute(select(Model).filter(Model.id == id))
+    model = result.scalars().first()
+    if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+    return {"model_id": id, "shap_summary": {}}
 
 @router.get("/drift")
-def get_drift_status(model_id: str = None):
+async def get_drift_status(model_id: str = None, session: AsyncSession = Depends(get_db)):
     """Generates a live drift report for a specific model."""
-    from app.serving.dependencies import _training_registry
     from app.monitoring.drift.engine import global_drift_engine
-    from fastapi import HTTPException
     
     if not model_id:
-        # Default to champion model if not specified
-        try:
-            aliases = _training_registry.list_aliases()
-            if "default" in aliases:
-                model_id = aliases["default"]
-            else:
-                raise HTTPException(status_code=400, detail="No model_id provided and no default alias found.")
-        except Exception:
-            raise HTTPException(status_code=400, detail="No model_id provided.")
+        # Default to the first champion model
+        result = await session.execute(select(ChampionModel))
+        champ = result.scalars().first()
+        if not champ:
+            raise HTTPException(status_code=400, detail="No model_id provided and no champion found.")
+        model_id = champ.model_id
             
     try:
-        meta = _training_registry.get(model_id)
-        report = global_drift_engine.generate_report(model_id, meta.baseline_profile)
+        # In a real implementation we would fetch the baseline profile from the artifact/DB
+        baseline_profile = {} 
+        report = global_drift_engine.generate_report(model_id, baseline_profile)
         
-        # Convert dataclass to dict
         from dataclasses import asdict
         report_dict = asdict(report)
         report_dict["timestamp"] = report.timestamp.isoformat()
@@ -212,16 +287,25 @@ def get_drift_status(model_id: str = None):
         raise HTTPException(status_code=500, detail=f"Failed to generate drift report: {e}")
 
 @router.get("/drift/history")
-def get_drift_history():
+async def get_drift_history(session: AsyncSession = Depends(get_db)):
     """Fetches historical drift alerts from the audit logger."""
-    from app.monitoring.audit import AuditLogger
-    logs = AuditLogger.get_logs(limit=100)
-    drift_logs = [log for log in logs if log["event_name"] in ["DRIFT_DETECTED", "FEATURE_DRIFT", "MODEL_DRIFT"]]
-    return {"history": drift_logs}
+    result = await session.execute(select(AuditLog).filter(AuditLog.event_name.in_(["DRIFT_DETECTED", "FEATURE_DRIFT", "MODEL_DRIFT"])).order_by(desc(AuditLog.created_at)).limit(100))
+    logs = result.scalars().all()
+    
+    history = []
+    for log in logs:
+        history.append({
+            "event_name": log.event_name,
+            "component": log.component,
+            "severity": log.severity,
+            "payload": log.payload,
+            "created_at": log.created_at.isoformat()
+        })
+    return {"history": history}
 
 @router.get("/drift/{feature}")
-def get_feature_drift(feature: str, model_id: str = None):
+async def get_feature_drift(feature: str, model_id: str = None, session: AsyncSession = Depends(get_db)):
     """Gets drift specifically for one feature."""
-    report = get_drift_status(model_id)
+    report = await get_drift_status(model_id, session)
     feature_drift = [f for f in report.get("drifted_features", []) if f["feature"] == feature]
     return {"feature": feature, "drift": feature_drift[0] if feature_drift else None}

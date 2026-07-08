@@ -8,7 +8,7 @@ import logging
 import sys
 from typing import Optional
 
-from app.config import settings
+import os
 
 _LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - [%(funcName)s] %(message)s"
 _DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
@@ -31,7 +31,7 @@ def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
         return logger
 
     # Resolve active log level
-    active_level_str: str = level or settings.log_level
+    active_level_str: str = level or os.getenv("LOG_LEVEL", "INFO")
     active_level: int = getattr(logging, active_level_str.upper(), logging.INFO)
     logger.setLevel(active_level)
 
