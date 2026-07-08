@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -33,7 +32,8 @@ async def get_champion(session: AsyncSession = Depends(get_db)):
     if not champion:
         raise HTTPException(status_code=404, detail="No champion model found")
         
-    model_result = await session.execute(select(Model).filter(Model.id == champion.model_id))
+    from sqlalchemy.orm import selectinload
+    model_result = await session.execute(select(Model).options(selectinload(Model.dataset)).filter(Model.id == champion.model_id))
     model = model_result.scalars().first()
     if not model:
         raise HTTPException(status_code=404, detail="Champion model artifact not found")
@@ -52,7 +52,8 @@ async def get_champion(session: AsyncSession = Depends(get_db)):
 @router.get("/challengers")
 async def get_challengers(session: AsyncSession = Depends(get_db)):
     # Any candidate or archived model is a challenger in this view
-    result = await session.execute(select(Model).filter(Model.status == "CANDIDATE"))
+    from sqlalchemy.orm import selectinload
+    result = await session.execute(select(Model).options(selectinload(Model.dataset)).filter(Model.status == "CANDIDATE"))
     challengers = result.scalars().all()
     items = []
     for model in challengers:

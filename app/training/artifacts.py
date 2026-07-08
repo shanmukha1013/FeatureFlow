@@ -20,7 +20,8 @@ class LocalArtifactStore:
         os.makedirs(self.base_dir, exist_ok=True)
         
     def _build_path(self, model_id: str, version: str) -> str:
-        return os.path.join(self.base_dir, f"{model_id}_v{version}.joblib")
+        v_clean = str(version)[1:] if str(version).startswith('v') or str(version).startswith('V') else str(version)
+        return os.path.join(self.base_dir, f"{model_id}_v{v_clean}.joblib")
 
     def _compute_checksum(self, file_path: str) -> str:
         """Generates a SHA-256 checksum for the specified file."""

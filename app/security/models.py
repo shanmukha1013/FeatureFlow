@@ -1,6 +1,5 @@
 from enum import Enum
 from dataclasses import dataclass
-from typing import List
 
 class Role(str, Enum):
     ADMINISTRATOR = "ADMINISTRATOR"

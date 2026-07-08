@@ -1,9 +1,8 @@
 import asyncio
 import time
 from sqlalchemy import text
-from app.storage.database import get_db, AsyncSessionLocal, engine
+from app.storage.database import AsyncSessionLocal, engine
 from app.storage.models import AuditLog, SystemMetric, Feature, Dataset
-from app.storage.repositories.core import DatasetRepository
 from app.utils.logger import get_logger
 
 logger = get_logger("perf_database")

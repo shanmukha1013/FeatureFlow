@@ -2,7 +2,6 @@ from typing import Generic, TypeVar, Type, Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete, update
-from sqlalchemy.orm import selectinload
 from app.storage.database import Base
 
 ModelType = TypeVar("ModelType", bound=Base)
@@ -29,6 +28,9 @@ class BaseRepository(Generic[ModelType]):
             select(self.model).filter(self.model.status != 'ARCHIVED').offset(skip).limit(limit)
         )
         return result.scalars().all()
+
+    async def get_all(self) -> List[ModelType]:
+        return await self.get_multi(skip=0, limit=100000)
 
     async def get_active(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
         return await self.get_multi(skip, limit)

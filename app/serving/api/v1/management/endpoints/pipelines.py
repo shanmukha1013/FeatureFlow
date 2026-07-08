@@ -53,7 +53,7 @@ async def get_pipelines(
         
     return PaginatedResponse(
         items=out_items, 
-        total=0, # total count omitted for performance, could do a COUNT query
+        total=len(out_items),
         page=page, 
         size=size, 
         has_next=has_next

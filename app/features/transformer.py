@@ -49,10 +49,17 @@ class FeatureTransformer:
                 if not col_name:
                     col_name = df.columns[0]
                     
+                ds_name = ""
+                try:
+                    if getattr(feature_record, "dataset", None):
+                        ds_name = feature_record.dataset.name
+                except Exception:
+                    ds_name = ""
+                    
                 meta = FeatureMetadata(
                     feature_id=feature_record.id,
                     name=feature_record.name,
-                    source_dataset=feature_record.dataset.name if feature_record.dataset else "",
+                    source_dataset=ds_name,
                     source_columns=[col_name],
                     transformation=feature_record.transformation,
                     data_type=feature_record.dtype,

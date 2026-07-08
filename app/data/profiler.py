@@ -7,7 +7,7 @@ without mutating the underlying data structure.
 import pandas as pd
 from typing import Dict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.utils.logger import get_logger
 from app.data.exceptions import DataProfilingError
@@ -82,7 +82,7 @@ class DataProfiler:
                 }
 
             report = ProfilingReport(
-                generated_at=datetime.utcnow(),
+                generated_at=datetime.now(timezone.utc),
                 row_count=row_count,
                 column_count=column_count,
                 memory_usage_mb=round(memory_usage, 2),

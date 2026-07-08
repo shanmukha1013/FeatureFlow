@@ -6,7 +6,7 @@ guaranteeing self-validation and execution safety during transformation.
 """
 from abc import ABC, abstractmethod
 import pandas as pd
-from typing import Any, List
+from typing import List
 
 from app.features.metadata import FeatureMetadata
 from app.features.exceptions import InvalidFeatureError, FeatureTransformationError

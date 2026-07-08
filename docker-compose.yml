@@ -8,8 +8,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ENV=production
+      - ENVIRONMENT=production
       - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/featureflow
       - POSTGRES_URL=postgresql://user:pass@postgres:5432/featureflow
       - JWT_SECRET=${JWT_SECRET:-enterprise-secret}
     depends_on:

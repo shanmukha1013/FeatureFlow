@@ -1,11 +1,10 @@
 """
 Implements the core prediction endpoint.
 """
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from app.serving.schemas.request import PredictRequestSchema
 from app.serving.schemas.response import PredictResponseSchema
 from app.serving.dependencies import get_prediction_engine
-from app.inference.request import PredictionRequest
 from app.inference.engine import PredictionEngine
 
 router = APIRouter()

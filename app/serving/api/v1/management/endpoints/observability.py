@@ -38,7 +38,7 @@ async def get_audit(
         "payload": row.payload
     } for row in items]
     
-    return PaginatedResponse(items=out_items, total=0, page=page, size=size, has_next=has_next)
+    return PaginatedResponse(items=out_items, total=len(out_items), page=page, size=size, has_next=has_next)
 
 @router.get("/health")
 def get_health():

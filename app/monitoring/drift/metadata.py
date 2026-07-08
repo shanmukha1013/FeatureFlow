@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List
 from enum import Enum
 
@@ -15,7 +15,7 @@ class DriftAlert:
     severity: DriftSeverity
     drift_score: float
     metric: str
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 @dataclass(frozen=True)
 class DriftReport:

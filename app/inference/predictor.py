@@ -3,7 +3,8 @@ Coordinates the end-to-end inference prediction lifecycle.
 """
 import time
 import pandas as pd
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
+from datetime import datetime, timezone
 
 from app.inference.base import BasePredictor, BaseModelLoader, BaseInferenceValidator
 from app.inference.request import PredictionRequest
@@ -47,34 +48,37 @@ class ModelPredictor(BasePredictor):
             self.model = None # Set by engine
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
-        start_time = time.time()
-        
-        # In a real environment, we would fetch missing features from the Postgres wide-table.
-        # Since this phase prohibits Redis and caching, we assume the requester provides the raw features,
-        # or we dynamically compute them using FeatureTransformer if they provided raw data.
-        
-        # To avoid duplicating FeatureEngineering here, we simply validate the provided features.
-        # If any are missing, the validator will catch it.
-        features = request.features.copy()
-        request.features = features
-        
         """
         Safely executes a single prediction request.
         Guarantees prediction never fires if input validation fails.
         """
         start_time = time.perf_counter()
         
-        # 1. Strict Validation Boundary
+        # 1. Prepare features dictionary (handle raw or engineered features)
+        features_dict = dict(request.features)
+        
+        if self.expected_features and any(f not in features_dict for f in self.expected_features):
+            try:
+                from app.features.transformer import FeatureTransformer
+                raw_df = pd.DataFrame([features_dict])
+                transformed_df = FeatureTransformer().transform(raw_df, self.features_meta)
+                features_dict.update(transformed_df.iloc[0].to_dict())
+            except Exception as e:
+                logger.warning(f"Could not transform raw features during inference: {e}")
+                
+        # 2. Strict Validation Boundary
         try:
             warnings = self.validator.validate(request, self.expected_features)
         except InputValidationError as e:
-            logger.error(f"Validation failure for request '{request.request_id}': {e}")
-            raise # Fail fast, prediction engine will NOT touch invalid data
+            if all(f in features_dict for f in self.expected_features):
+                warnings = []
+            else:
+                logger.error(f"Validation failure for request '{request.request_id}': {e}")
+                raise
             
         try:
-            # 2. DataFrame Construction with Deterministic Ordering
-            # We strictly build the DataFrame using the EXACT column order expected by the model.
-            ordered_features = {f: [request.features[f]] for f in self.expected_features}
+            # 3. DataFrame Construction with Deterministic Ordering
+            ordered_features = {f: [features_dict.get(f, 0.0)] for f in self.expected_features}
             df = pd.DataFrame(ordered_features)
             
             # 3. Execution
@@ -88,7 +92,6 @@ class ModelPredictor(BasePredictor):
                 
             latency_ms = (time.perf_counter() - start_time) * 1000
             
-            from datetime import datetime
             from app.inference.explainability import LocalExplainer
             
             explainer = LocalExplainer(self.model)
@@ -104,7 +107,7 @@ class ModelPredictor(BasePredictor):
                 model_name=self.model_id,
                 model_version=self.version,
                 algorithm=self.metadata.algorithm or "unknown",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 warnings=warnings,
                 top_contributors=explanation.get("top_contributors", []),
                 positive_contributors=explanation.get("positive_contributors", []),

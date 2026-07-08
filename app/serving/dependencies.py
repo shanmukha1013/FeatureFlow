@@ -2,8 +2,6 @@
 FastAPI Dependency Injection for the Serving Layer.
 Manages the lifecycle of heavy ML registries and predictors.
 """
-from typing import Dict
-from threading import Lock
 
 from app.training.artifacts import LocalArtifactStore
 from app.inference.validator import RequestValidator

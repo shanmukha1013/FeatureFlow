@@ -5,7 +5,7 @@ import sys
 import platform
 import fastapi
 from fastapi import APIRouter, Depends
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -107,7 +107,7 @@ async def get_about():
         author="ML Platform Team",
         license="Internal",
         repository="internal/featureflow",
-        build_timestamp=datetime.utcnow().isoformat()
+        build_timestamp=datetime.now(timezone.utc).isoformat()
     )
 
 @router.get("/config", response_model=ConfigSchema)

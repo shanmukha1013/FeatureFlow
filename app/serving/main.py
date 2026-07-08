@@ -12,6 +12,28 @@ from app.serving.exceptions import (
 )
 from app.inference.exceptions import InputValidationError, ModelLoadError, InferenceError, PredictionError
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app.storage.database import init_db
+    import threading
+    from app.data.discovery import DatasetDiscovery
+    from app.serving.dependencies import _prediction_engine
+
+    # Initialize Database connection and create tables
+    await init_db()
+    
+    # Start Prediction Engine immediately to warm caches
+    await _prediction_engine.start()
+    
+    def run_discovery():
+        discovery = DatasetDiscovery()
+        discovery.discover_datasets()
+        
+    threading.Thread(target=run_discovery, daemon=True).start()
+    yield
+
 def create_app() -> FastAPI:
     """
     Constructs the FastAPI application for deployment.
@@ -19,7 +41,8 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=serving_config.title, 
         version=serving_config.api_version,
-        description="FeatureFlow Online Inference API"
+        description="FeatureFlow Online Inference API",
+        lifespan=lifespan
     )
     
     # 1. Mount Middleware
@@ -42,26 +65,9 @@ def create_app() -> FastAPI:
     
     # 3. Mount Routers
     app.include_router(v1_router, prefix=f"/api/{serving_config.api_version}")
-
-    from app.storage.database import init_db
-    import threading
-    from app.data.discovery import DatasetDiscovery
-    from app.serving.dependencies import _prediction_engine
+    from app.serving.api.v1.endpoints import health
+    app.include_router(health.router, tags=["health"])
     
-    @app.on_event("startup")
-    async def startup_event():
-        # Initialize Database connection and create tables
-        await init_db()
-        
-        # Start Prediction Engine immediately to warm caches
-        await _prediction_engine.start()
-        
-        def run_discovery():
-            discovery = DatasetDiscovery()
-            discovery.discover_datasets()
-            
-        threading.Thread(target=run_discovery, daemon=True).start()
-        
     return app
 
 # The standard ASGI entrypoint (e.g. `uvicorn app.serving.main:app`)

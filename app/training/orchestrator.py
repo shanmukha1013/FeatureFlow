@@ -1,11 +1,9 @@
 import time
-import uuid
 import pandas as pd
-from typing import List, Dict, Any
-from datetime import datetime
+from typing import List
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
 from app.utils.logger import get_logger
 from app.features.transformer import FeatureTransformer
@@ -16,7 +14,7 @@ from app.training.evaluator import ClassificationEvaluator
 from app.training.artifacts import LocalArtifactStore
 from app.monitoring.audit import AuditLogger, AuditEvent
 from app.storage.repositories.core import ModelRepository, ChampionModelRepository, ExperimentRepository, FeatureRepository
-from app.storage.models import Dataset, Feature, Model, ChampionModel, Experiment
+from app.storage.models import Dataset, Feature
 
 logger = get_logger(__name__)
 
@@ -30,17 +28,33 @@ class TrainingOrchestrator:
         self.feature_transformer = FeatureTransformer()
 
     def _select_target_column(self, df: pd.DataFrame, dataset_name: str) -> str:
-        """Heuristically select a target column for automated training."""
+        """Heuristically select a low/medium-cardinality target column for automated classification training."""
         for col in df.columns:
             lower = col.lower()
-            if lower in ['target', 'label', 'class', 'outcome']:
-                return col
+            if lower in ['target', 'label', 'class', 'outcome', 'status', 'category', 'tier', 'type']:
+                if df[col].nunique() <= min(50, len(df) // 2):
+                    return col
             if lower.startswith('is_') or lower.startswith('has_'):
-                return col
+                if df[col].nunique() <= min(50, len(df) // 2):
+                    return col
                 
-        valid_cols = [c for c in df.columns if not c.lower().endswith('id')]
+        valid_cols = []
+        for c in df.columns:
+            lower = c.lower()
+            if lower.endswith('id') or 'uuid' in lower or 'ref' in lower or 'date' in lower or 'time' in lower or lower.endswith('_at') or 'timestamp' in lower:
+                continue
+            if df[c].nunique() > 50 and df[c].nunique() > min(50, len(df) * 0.1):
+                continue
+            valid_cols.append(c)
+            
         if valid_cols:
             return valid_cols[-1]
+            
+        candidates = [(c, df[c].nunique()) for c in df.columns if df[c].nunique() > 1 and not c.lower().endswith('id') and not c.lower().endswith('_at')]
+        if candidates:
+            candidates.sort(key=lambda x: x[1])
+            return candidates[0][0]
+            
         return df.columns[-1]
 
     async def _get_features_for_dataset(self, session: AsyncSession, dataset_id: str) -> List[Feature]:
@@ -73,8 +87,13 @@ class TrainingOrchestrator:
             df_features[target_col] = df_raw[target_col]
             df_features.dropna(subset=[target_col], inplace=True)
             
+            if df_features[target_col].nunique() > 10:
+                logger.info(f"Target column '{target_col}' has {df_features[target_col].nunique()} unique values. Discretizing to top 5 categories + 'Other' for classification stability.")
+                top_classes = set(df_features[target_col].value_counts().nlargest(5).index)
+                df_features[target_col] = df_features[target_col].apply(lambda x: x if x in top_classes else 'Other')
+            
             from sklearn.preprocessing import LabelEncoder
-            df_features[target_col] = LabelEncoder().fit_transform(df_features[target_col])
+            df_features[target_col] = LabelEncoder().fit_transform(df_features[target_col].astype(str))
             
             feature_names = [f.name for f in features]
             X, y = self.dataset_builder.prepare(df_features, feature_names, target_col)
@@ -142,7 +161,7 @@ class TrainingOrchestrator:
                     shap_summ = explainer.compute_shap_summary(ml_model, X_train)
                     
                     baseline_profile = BaselineProfiler.compute_baseline(X_train, y_train)
-                    await AuditLogger.record(session, AuditEvent(event_name="BASELINE_UPDATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str}))
+                    await AuditLogger.record(session, AuditEvent(event_name="BASELINE_UPDATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str, "baseline_features": len(baseline_profile) if isinstance(baseline_profile, dict) else 0}))
                     
                     if feat_imp:
                         await AuditLogger.record(session, AuditEvent(event_name="EXPLANATION_GENERATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str}))
@@ -177,7 +196,7 @@ class TrainingOrchestrator:
                         "status": "COMPLETED",
                         "metrics": metrics,
                         "model_id": meta.id,
-                        "end_time": datetime.utcnow()
+                        "end_time": datetime.now(timezone.utc)
                     })
                     await AuditLogger.record(session, AuditEvent(event_name="EXPERIMENT_FINISHED", component="TrainingOrchestrator", severity="INFO", payload={"experiment_id": experiment.id}))
                     await AuditLogger.record(session, AuditEvent(event_name="MODEL_REGISTERED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": meta.id}))
@@ -185,7 +204,7 @@ class TrainingOrchestrator:
                 except Exception as e:
                     await experiment_repo.update(experiment, {
                         "status": "FAILED",
-                        "end_time": datetime.utcnow()
+                        "end_time": datetime.now(timezone.utc)
                     })
                     await AuditLogger.record(session, AuditEvent(event_name="EXPERIMENT_FAILED", component="TrainingOrchestrator", severity="ERROR", payload={"experiment_id": experiment.id}))
                     await AuditLogger.record(session, AuditEvent(event_name="TRAINING_FAILED", component="TrainingOrchestrator", severity="ERROR", payload={"algorithm": algo_name, "error": str(e)}))

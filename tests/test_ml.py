@@ -4,14 +4,12 @@ Tests real trainers, evaluators, artifact store, and prediction engine.
 """
 import pytest
 import os
-import shutil
 import pandas as pd
 import numpy as np
 
 from app.training.trainer import LogisticRegressionTrainer, RandomForestTrainer
 from app.training.evaluator import ClassificationEvaluator
 from app.training.artifacts import LocalArtifactStore
-from app.training.exceptions import TrainingFailure
 from app.inference.engine import PredictionEngine
 from app.inference.exceptions import InferenceError, PredictionError
 

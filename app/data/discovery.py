@@ -4,8 +4,7 @@ import pandas as pd
 import hashlib
 import time
 import asyncio
-from typing import Dict, Any, List
-from datetime import datetime
+from typing import List
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.storage.database import AsyncSessionLocal
@@ -39,8 +38,6 @@ class DatasetDiscovery:
         
     async def _process_dataset(self, session: AsyncSession, dataset_record: Dataset, relative_path: str, dataset_name: str) -> None:
         """Executes Validation and Profiling on a registered dataset."""
-        import traceback
-        
         start_time = time.time()
         # 1. Load Data
         df = self.loader.load(relative_path)
@@ -91,7 +88,7 @@ class DatasetDiscovery:
         trainer = TrainingOrchestrator(data_dir=self.data_dir)
         await trainer.execute(session, dataset_record, relative_path)
 
-    async def _async_discover_datasets(self) -> List[Dataset]:
+    async def _async_discover_datasets(self, force: bool = False) -> List[Dataset]:
         logger.info(f"Initiating dataset discovery in '{self.data_dir}'.")
         
         if not os.path.exists(self.data_dir):
@@ -166,16 +163,25 @@ class DatasetDiscovery:
                         event_name="DATASET_REGISTERED",
                         component="DatasetDiscovery",
                         severity="INFO",
-                        payload={"dataset_id": dataset_record.id, "dataset_name": dataset_name}
+                        payload={
+                            "dataset_id": dataset_record.id,
+                            "dataset_name": dataset_name,
+                            "file_size_bytes": stat.st_size,
+                            "row_count": row_count,
+                            "sha256": checksum
+                        }
                     ))
                     
                     # Commit dataset creation before processing is deferred
 
                     logger.info(f"Introspected and registered dataset: '{dataset_name}'")
                     
-                    # Trigger Pipeline
-                    relative_path = os.path.relpath(file_path, self.data_dir)
-                    await self._process_dataset(session, dataset_record, relative_path, dataset_name)
+                    # Trigger Pipeline only if not already processed or if force=True
+                    if force or dataset_record.status == "REGISTERED" or not dataset_record.status:
+                        relative_path = os.path.relpath(file_path, self.data_dir)
+                        await self._process_dataset(session, dataset_record, relative_path, dataset_name)
+                    else:
+                        logger.info(f"Dataset '{dataset_name}' already processed (status: {dataset_record.status}). Skipping pipeline re-execution.")
                     
                     # Transaction Commit for the entire pipeline of this dataset
                     await session.commit()
@@ -197,6 +203,6 @@ class DatasetDiscovery:
         logger.info(f"Discovery complete. Found {len(discovered)} datasets.")
         return discovered
 
-    def discover_datasets(self) -> None:
+    def discover_datasets(self, force: bool = False) -> None:
         """Synchronous wrapper for async discovery."""
-        asyncio.run(self._async_discover_datasets())
+        asyncio.run(self._async_discover_datasets(force=force))

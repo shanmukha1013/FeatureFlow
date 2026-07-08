@@ -5,7 +5,7 @@ Integrates context variables to automatically inject correlation IDs into every 
 import contextvars
 import logging
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Context variable to hold trace ID across async execution boundaries
 correlation_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("correlation_id", default="system")
@@ -16,7 +16,7 @@ class StructuredJSONFormatter(logging.Formatter):
     """
     def format(self, record: logging.LogRecord) -> str:
         log_obj = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "message": record.getMessage(),
             "correlation_id": correlation_id_var.get(),

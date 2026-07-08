@@ -24,12 +24,12 @@ class Settings:
     source of truth for configurations.
     """
     project_name: str = os.getenv("PROJECT_NAME", "FeatureFlow")
-    environment: str = os.getenv("ENVIRONMENT", "development")
+    environment: str = os.getenv("ENVIRONMENT") or os.getenv("ENV", "development")
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     data_dir: str = os.getenv("DATA_DIR", "./datasets")
     
     # Database Configuration
-    database_url: str = os.getenv("DATABASE_URL")
+    database_url: str = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL")
 
     def __post_init__(self):
         if not self.database_url:

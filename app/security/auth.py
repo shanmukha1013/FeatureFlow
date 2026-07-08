@@ -10,11 +10,11 @@ features will be added (Phase 5 scope).
 """
 import jwt
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import HTTPException
 
-from app.security.models import User, Role, Permission, ROLE_PERMISSIONS
+from app.security.models import Role, Permission, ROLE_PERMISSIONS
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -34,7 +34,7 @@ class SecurityManager:
 
     def create_token(self, username: str, role: str = "VIEWER") -> str:
         """Creates a JWT token for the given username and role."""
-        expires = datetime.utcnow() + timedelta(hours=8)
+        expires = datetime.now(timezone.utc) + timedelta(hours=8)
         payload = {
             "sub": username,
             "role": role,

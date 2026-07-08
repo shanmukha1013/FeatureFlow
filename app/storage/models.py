@@ -29,6 +29,7 @@ class Dataset(Base):
     versions = relationship("DatasetVersion", back_populates="dataset", cascade="all, delete-orphan")
     features = relationship("Feature", back_populates="dataset", cascade="all, delete-orphan")
     models = relationship("Model", back_populates="dataset", cascade="all, delete-orphan")
+    experiments = relationship("Experiment", back_populates="dataset", cascade="all, delete-orphan")
 
 class DatasetVersion(Base):
     __tablename__ = "dataset_versions"
@@ -142,6 +143,7 @@ class Model(Base):
     dataset = relationship("Dataset", back_populates="models")
     versions = relationship("ModelVersion", back_populates="model", cascade="all, delete-orphan")
     champions = relationship("ChampionModel", back_populates="model", cascade="all, delete-orphan")
+    experiments = relationship("Experiment", back_populates="model", cascade="all, delete-orphan")
 
 class ModelVersion(Base):
     __tablename__ = "model_versions"
@@ -199,6 +201,9 @@ class Experiment(Base):
     end_time = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    dataset = relationship("Dataset", back_populates="experiments")
+    model = relationship("Model", back_populates="experiments")
 
 class PipelineRun(Base):
     __tablename__ = "pipeline_runs"

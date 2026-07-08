@@ -35,7 +35,7 @@ class TrainingDatasetBuilder:
         if entity_id_column and entity_id_column in df.columns:
             if df[entity_id_column].duplicated().any():
                 logger.error(f"Data integrity violation: Duplicate keys in '{entity_id_column}'.")
-                raise DatasetPreparationError(f"Duplicate entity IDs detected. Resolve upstream.")
+                raise DatasetPreparationError(f"Duplicate entity IDs in '{entity_id_column}' detected. Resolve upstream.")
                 
         # Target Validation
         if target_column not in df.columns:

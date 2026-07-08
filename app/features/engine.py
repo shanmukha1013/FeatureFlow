@@ -1,7 +1,5 @@
-import uuid
 import time
-from datetime import datetime
-from typing import List, Dict, Type, Any
+from typing import List, Dict, Any
 
 from app.utils.logger import get_logger
 from app.monitoring.audit import AuditLogger, AuditEvent
@@ -82,7 +80,6 @@ class FeatureEngineeringEngine:
         start_time = time.time()
         
         features_generated = 0
-        now_str = datetime.utcnow().isoformat()
         
         dtypes_to_process = dataset_record.inferred_dtypes if dataset_record.inferred_dtypes else {}
         

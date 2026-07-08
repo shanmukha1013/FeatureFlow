@@ -12,7 +12,7 @@ from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient, ASGITransport
 
-from app.storage.database import AsyncSessionLocal, init_db, engine
+from app.storage.database import AsyncSessionLocal, init_db
 from app.serving.main import app
 
 

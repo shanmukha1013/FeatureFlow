@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.storage.repositories.base import BaseRepository
 from app.storage.models import (
-    Dataset, DatasetVersion, Feature, Model, ModelVersion, 
+    Dataset, DatasetVersion, Feature, Model, 
     ChampionModel, Experiment, PipelineRun, AuditLog
 )
 
@@ -16,6 +16,13 @@ class DatasetRepository(BaseRepository[Dataset]):
             select(Dataset)
             .filter(Dataset.name == name, Dataset.status != 'ARCHIVED')
         )
+        return result.scalars().first()
+
+    async def get_by_name_and_version(self, name: str, version: int = None) -> Optional[Dataset]:
+        query = select(Dataset).filter(Dataset.name == name, Dataset.status != 'ARCHIVED')
+        if version is not None:
+            query = query.filter(Dataset.version == version)
+        result = await self.session.execute(query)
         return result.scalars().first()
 
 class DatasetVersionRepository(BaseRepository[DatasetVersion]):
@@ -65,6 +72,15 @@ class ModelRepository(BaseRepository[Model]):
         )
         return result.scalars().first()
 
+    async def get_by_dataset(self, dataset_id: str) -> List[Model]:
+        from sqlalchemy.orm import selectinload
+        result = await self.session.execute(
+            select(Model)
+            .options(selectinload(Model.dataset))
+            .filter(Model.dataset_id == dataset_id, Model.status != 'ARCHIVED')
+        )
+        return result.scalars().all()
+
 class ChampionModelRepository(BaseRepository[ChampionModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(ChampionModel, session)
@@ -93,6 +109,15 @@ class ExperimentRepository(BaseRepository[Experiment]):
             .filter(Experiment.name == name, Experiment.status != 'ARCHIVED')
         )
         return result.scalars().first()
+
+    async def get_by_dataset(self, dataset_id: str) -> List[Experiment]:
+        from sqlalchemy.orm import selectinload
+        result = await self.session.execute(
+            select(Experiment)
+            .options(selectinload(Experiment.dataset))
+            .filter(Experiment.dataset_id == dataset_id, Experiment.status != 'ARCHIVED')
+        )
+        return result.scalars().all()
 
 class PipelineRunRepository(BaseRepository[PipelineRun]):
     def __init__(self, session: AsyncSession):

@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from typing import Any
 from app.features.feature import BaseFeature
 
 # =======================
@@ -32,7 +31,6 @@ class RobustScalerFeature(BaseFeature):
 
 class LogTransformFeature(BaseFeature):
     def transform(self, df: pd.DataFrame) -> pd.Series:
-        import numpy as np
         col = self.metadata.source_columns[0]
         # Adding small epsilon to avoid log(0)
         return np.log1p(df[col].clip(lower=0))

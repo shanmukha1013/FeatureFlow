@@ -5,7 +5,7 @@ Provides complete observability and auditability for every prediction
 served by the platform.
 """
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 @dataclass(frozen=True)
 class InferenceMetadata:
@@ -20,4 +20,4 @@ class InferenceMetadata:
     dataset_version: str
     artifact_checksum: str
     latency_ms: float
-    prediction_timestamp: datetime = field(default_factory=datetime.utcnow)
+    prediction_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

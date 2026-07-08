@@ -5,7 +5,7 @@ Ensures absolute reproducibility by tracking the exact lineage of algorithms,
 hyperparameters, features, and evaluation metrics tied to every trained artifact.
 """
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from enum import Enum
 
@@ -78,7 +78,7 @@ class TrainingReport:
     """
     model_id: str
     status: str = "PENDING"
-    start_time: datetime = field(default_factory=datetime.utcnow)
+    start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     end_time: Optional[datetime] = None
     metadata: Optional[ModelMetadata] = None
     error_message: Optional[str] = None
@@ -86,12 +86,12 @@ class TrainingReport:
     def mark_success(self, metadata: ModelMetadata) -> None:
         self.status = "SUCCESS"
         self.metadata = metadata
-        self.end_time = datetime.utcnow()
+        self.end_time = datetime.now(timezone.utc)
         
     def mark_failure(self, error: str) -> None:
         self.status = "FAILED"
         self.error_message = error
-        self.end_time = datetime.utcnow()
+        self.end_time = datetime.now(timezone.utc)
         
     @property
     def total_duration_ms(self) -> float:

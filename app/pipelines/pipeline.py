@@ -7,7 +7,7 @@ and tracks experiments - all within PostgreSQL-backed transactions.
 from typing import Optional, List
 
 from app.pipelines.base import BasePipeline
-from app.pipelines.execution_context import PipelineExecutionReport, DatasetExecutionReport
+from app.pipelines.execution_context import PipelineExecutionReport
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

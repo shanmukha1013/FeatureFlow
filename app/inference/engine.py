@@ -1,9 +1,9 @@
 import pandas as pd
 from typing import Dict, List, Any
 from io import StringIO
-import time
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
+from sqlalchemy.future import select
 
 from app.utils.logger import get_logger
 
@@ -52,13 +52,8 @@ class PredictionEngine:
             champion_repo = ChampionModelRepository(session)
             model_repo = ModelRepository(session)
             
-            # For simplicity, we just load the first champion model
-            # In a real system we'd load champions per dataset
-            # Here we just load all champions
-            from sqlalchemy.future import select
-            from app.storage.models import ChampionModel
-            result = await session.execute(select(ChampionModel))
-            champions = result.scalars().all()
+            # Load all champions via repository
+            champions = await champion_repo.get_all()
             
             active_models = []
             for c in champions:
@@ -73,8 +68,9 @@ class PredictionEngine:
                 try:
                     # Fetch features for this dataset
                     from app.storage.models import Feature
+                    from sqlalchemy.orm import selectinload
                     feature_result = await session.execute(
-                        select(Feature).filter(Feature.dataset_id == meta.dataset_id)
+                        select(Feature).options(selectinload(Feature.dataset)).filter(Feature.dataset_id == meta.dataset_id)
                     )
                     features_meta = feature_result.scalars().all()
                     
@@ -88,10 +84,15 @@ class PredictionEngine:
                         model_alias=meta.id
                     )
                     # Load model from disk artifact
-                    predictor.model = self.artifact_store.load(meta.id, f"v{meta.version}")
+                    import os, joblib
+                    if meta.artifact_uri and os.path.exists(meta.artifact_uri):
+                        predictor.model = joblib.load(meta.artifact_uri)
+                    else:
+                        predictor.model = self.artifact_store.load(meta.id, f"v{meta.version}")
                     
                     self.predictors[meta.id] = predictor
                     self.routing_registry[meta.id] = (meta.id, f"v{meta.version}")
+                    self.routing_registry[meta.name] = (meta.id, f"v{meta.version}")
                     
                     await AuditLogger.record(session, AuditEvent(event_name="MODEL_LOADED", component="PredictionEngine", severity="INFO", payload={"model_id": meta.id, "state": "CHAMPION"}))
                 except Exception as e:
@@ -106,6 +107,7 @@ class PredictionEngine:
             
             if champion_meta:
                 self.default_alias = champion_meta.id
+                self.routing_registry["default"] = (champion_meta.id, f"v{champion_meta.version}")
             else:
                 logger.warning("No CHAMPION model found during Prediction Engine startup.")
 
@@ -139,7 +141,7 @@ class PredictionEngine:
             
             self.stats["prediction_count"] += 1
             self.stats["total_latency_ms"] += response.latency_ms
-            self.stats["last_prediction_time"] = datetime.utcnow().isoformat()
+            self.stats["last_prediction_time"] = datetime.now(timezone.utc).isoformat()
             
             return response
             
@@ -163,7 +165,7 @@ class PredictionEngine:
                     self.stats["prediction_count"] += 1
                     return response
                 except Exception as fallback_e:
-                    raise PredictionError(f"Primary and Fallback predictions failed.") from fallback_e
+                    raise PredictionError(f"Primary ({e}) and Fallback ({fallback_e}) predictions failed.") from fallback_e
                     
             raise PredictionError("Prediction failed and no fallback models are available.") from e
 

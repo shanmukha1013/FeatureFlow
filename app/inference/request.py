@@ -3,7 +3,7 @@ Defines the immutable prediction request contract.
 """
 from dataclasses import dataclass, field
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 @dataclass(frozen=True)
@@ -14,4 +14,4 @@ class PredictionRequest:
     entity_id: str
     features: Dict[str, Any]
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

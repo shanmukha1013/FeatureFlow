@@ -1,10 +1,9 @@
 import numpy as np
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Lock
 from collections import deque
-from app.monitoring.drift.metadata import DriftReport, DriftSeverity, DriftAlert
-from app.monitoring.audit import AuditLogger, AuditEvent
+from app.monitoring.drift.metadata import DriftReport, DriftSeverity
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -76,7 +75,7 @@ class DriftEngine:
         if not live or not baseline_profile:
             return DriftReport(
                 model_id=model_id,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 overall_drift_score=0.0,
                 severity=DriftSeverity.NONE,
                 drifted_features=[],
@@ -153,7 +152,7 @@ class DriftEngine:
             
         return DriftReport(
             model_id=model_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             overall_drift_score=max_psi,
             severity=overall_severity,
             drifted_features=drifted_features,
