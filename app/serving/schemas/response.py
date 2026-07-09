@@ -40,3 +40,15 @@ class VersionResponseSchema(BaseModel):
     """
     platform_version: str
     api_version: str
+
+class RedisHealthResponseSchema(BaseModel):
+    """
+    Schema for the Redis Cloud health check probe.
+    """
+    connection_status: str
+    ping_latency_ms: float
+    redis_version: str
+    memory_usage: Any
+    connected_clients: int
+    url_redacted: Optional[str] = None
+

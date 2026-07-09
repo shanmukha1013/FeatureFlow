@@ -20,9 +20,13 @@ async def lifespan(app: FastAPI):
     import threading
     from app.data.discovery import DatasetDiscovery
     from app.serving.dependencies import _prediction_engine
+    from app.cache import RedisClient
 
     # Initialize Database connection and create tables
     await init_db()
+    
+    # Initialize Redis Cloud connection pool
+    redis_client = await RedisClient.get_instance()
     
     # Start Prediction Engine immediately to warm caches
     await _prediction_engine.start()
@@ -36,6 +40,8 @@ async def lifespan(app: FastAPI):
     if "pytest" not in sys.modules and not os.getenv("PYTEST_CURRENT_TEST") and settings.environment.lower() != "test":
         threading.Thread(target=run_discovery, daemon=True).start()
     yield
+    # Cleanly disconnect from Redis on application shutdown
+    await redis_client.disconnect()
 
 def create_app() -> FastAPI:
     """
