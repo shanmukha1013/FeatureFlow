@@ -95,3 +95,40 @@ async def test_prediction_engine_no_model_error(temp_artifact_store):
     engine = PredictionEngine(artifact_store=temp_artifact_store)
     with pytest.raises((InferenceError, PredictionError)):
         await engine.predict_single({"feature1": 1.0}, alias="nonexistent")
+
+
+def test_local_artifact_store_path_traversal(temp_artifact_store):
+    from app.training.exceptions import ArtifactError
+    with pytest.raises(ArtifactError):
+        temp_artifact_store._build_path("../../evil_model", "v1")
+
+
+def test_local_artifact_store_corrupted_checksum(sample_dataset, temp_artifact_store):
+    from app.training.exceptions import ArtifactError
+    X, y = sample_dataset
+    trainer = LogisticRegressionTrainer()
+    model = trainer.train(X, y)
+    
+    model_id = "test_model_corrupt"
+    version = "v1"
+    
+    path, checksum = temp_artifact_store.save(model, model_id, version)
+    assert os.path.exists(path)
+    
+    # Try loading with mismatched checksum
+    with pytest.raises(ArtifactError, match="checksum verification failed"):
+        temp_artifact_store.load(model_id, version, expected_checksum="0000000000000000000000000000000000000000000000000000000000000000")
+
+
+def test_local_artifact_store_missing_file(temp_artifact_store):
+    from app.training.exceptions import ArtifactError
+    with pytest.raises(ArtifactError, match="Artifact not found"):
+        temp_artifact_store.load("nonexistent_model", "v99")
+
+
+@pytest.mark.asyncio
+async def test_prediction_engine_batch_prediction(temp_artifact_store):
+    engine = PredictionEngine(artifact_store=temp_artifact_store)
+    with pytest.raises((InferenceError, PredictionError)):
+        await engine.predict_batch([{"feature1": 1.0}, {"feature1": 2.0}], alias="nonexistent")
+

@@ -150,6 +150,8 @@ class TrainingOrchestrator:
                     
                     # 4. Save Artifact
                     artifact_path, checksum = self.artifact_store.save(ml_model, model_id_str, f"v{version}")
+                    if isinstance(metrics, dict):
+                        metrics["_checksum"] = checksum
                     await AuditLogger.record(session, AuditEvent(event_name="ARTIFACT_SAVED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str, "checksum": checksum}))
                     
                     # 5. Explainability & Baseline Profiling

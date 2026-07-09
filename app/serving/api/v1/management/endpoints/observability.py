@@ -40,6 +40,16 @@ async def get_audit(
     
     return PaginatedResponse(items=out_items, total=len(out_items), page=page, size=size, has_next=has_next)
 
+@router.get("/events", response_model=PaginatedResponse[Any])
+async def get_events(
+    page: int = Query(1, ge=1), 
+    size: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=100),
+    session: AsyncSession = Depends(get_db)
+):
+    res = await get_audit(page=page, size=min(size, limit), session=session)
+    return res
+
 @router.get("/health")
 def get_health():
     """Returns deep dependency probe results."""

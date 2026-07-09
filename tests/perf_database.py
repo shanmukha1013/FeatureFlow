@@ -1,3 +1,4 @@
+import pytest
 import asyncio
 import time
 from sqlalchemy import text
@@ -7,6 +8,7 @@ from app.utils.logger import get_logger
 
 logger = get_logger("perf_database")
 
+@pytest.mark.asyncio
 async def test_concurrent_reads(concurrency=50):
     start = time.perf_counter()
     async def _read():
@@ -16,6 +18,7 @@ async def test_concurrent_reads(concurrency=50):
     await asyncio.gather(*[_read() for _ in range(concurrency)])
     logger.info(f"Completed {concurrency} concurrent reads in {time.perf_counter() - start:.2f}s")
 
+@pytest.mark.asyncio
 async def test_concurrent_writes_and_rollbacks(concurrency=20):
     start = time.perf_counter()
     async def _write_and_rollback(i):
@@ -33,6 +36,7 @@ async def test_concurrent_writes_and_rollbacks(concurrency=20):
     await asyncio.gather(*[_write_and_rollback(i) for i in range(concurrency)])
     logger.info(f"Completed {concurrency} concurrent writes & rollbacks in {time.perf_counter() - start:.2f}s")
 
+@pytest.mark.asyncio
 async def test_bulk_inserts():
     start = time.perf_counter()
     async with AsyncSessionLocal() as session:

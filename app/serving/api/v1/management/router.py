@@ -29,8 +29,11 @@ management_router = APIRouter(
 )
 
 management_router.include_router(overview_router)
-management_router.include_router(registries_router)
-management_router.include_router(pipelines_router)
-management_router.include_router(observability_router)
+management_router.include_router(registries_router, prefix="/registries")
+management_router.include_router(registries_router) # backward compatibility for /management/datasets
+management_router.include_router(pipelines_router, prefix="/pipelines")
+management_router.include_router(pipelines_router) # backward compatibility for /management/pipelines
+management_router.include_router(observability_router, prefix="/observability")
+management_router.include_router(observability_router) # backward compatibility for /management/audit
 management_router.include_router(retraining_router)
 management_router.include_router(enterprise_router)

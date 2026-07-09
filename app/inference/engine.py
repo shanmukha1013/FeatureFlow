@@ -3,6 +3,8 @@ from typing import Dict, List, Any
 from io import StringIO
 from datetime import datetime, timezone
 import uuid
+import os
+import joblib
 from sqlalchemy.future import select
 
 from app.utils.logger import get_logger
@@ -83,12 +85,16 @@ class PredictionEngine:
                         features_meta=features_meta,
                         model_alias=meta.id
                     )
-                    # Load model from disk artifact
-                    import os, joblib
+                    # Load model from disk artifact with SHA-256 checksum verification
+                    expected_checksum = meta.metrics.get("_checksum") if isinstance(meta.metrics, dict) else None
                     if meta.artifact_uri and os.path.exists(meta.artifact_uri):
+                        if expected_checksum:
+                            actual_checksum = self.artifact_store._compute_checksum(meta.artifact_uri)
+                            if actual_checksum != expected_checksum:
+                                raise InferenceError(f"Integrity failure for artifact at {meta.artifact_uri}. Checksum mismatch.")
                         predictor.model = joblib.load(meta.artifact_uri)
                     else:
-                        predictor.model = self.artifact_store.load(meta.id, f"v{meta.version}")
+                        predictor.model = self.artifact_store.load(meta.id, f"v{meta.version}", expected_checksum=expected_checksum)
                     
                     self.predictors[meta.id] = predictor
                     self.routing_registry[meta.id] = (meta.id, f"v{meta.version}")
@@ -110,6 +116,14 @@ class PredictionEngine:
                 self.routing_registry["default"] = (champion_meta.id, f"v{champion_meta.version}")
             else:
                 logger.warning("No CHAMPION model found during Prediction Engine startup.")
+
+    async def reload(self):
+        """Wipes active predictors and re-initializes from PostgreSQL."""
+        logger.info("Reloading Prediction Engine from database.")
+        self.predictors.clear()
+        self.routing_registry.clear()
+        self.default_alias = None
+        await self.start()
 
     async def _execute_predict(self, request: PredictionRequest, alias: str = "default") -> PredictionResponse:
         """Core prediction logic with fallback mechanism."""

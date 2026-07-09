@@ -21,7 +21,10 @@ class LocalArtifactStore:
         
     def _build_path(self, model_id: str, version: str) -> str:
         v_clean = str(version)[1:] if str(version).startswith('v') or str(version).startswith('V') else str(version)
-        return os.path.join(self.base_dir, f"{model_id}_v{v_clean}.joblib")
+        target_path = os.path.abspath(os.path.join(self.base_dir, f"{model_id}_v{v_clean}.joblib"))
+        if not target_path.startswith(self.base_dir):
+            raise ArtifactError("Security violation: path traversal attempted beyond base_dir boundary.")
+        return target_path
 
     def _compute_checksum(self, file_path: str) -> str:
         """Generates a SHA-256 checksum for the specified file."""

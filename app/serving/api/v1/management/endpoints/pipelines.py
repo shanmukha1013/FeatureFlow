@@ -12,6 +12,7 @@ from sqlalchemy import desc
 router = APIRouter()
 
 @router.get("/pipelines", response_model=PaginatedResponse[Any])
+@router.get("/runs", response_model=PaginatedResponse[Any])
 async def get_pipelines(
     page: int = Query(1, ge=1), 
     size: int = Query(50, ge=1, le=100),

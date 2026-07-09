@@ -41,6 +41,24 @@ class BaseRepository(Generic[ModelType]):
         )
         return result.scalars().all()
 
+    async def count(self) -> int:
+        from sqlalchemy import func
+        result = await self.session.execute(
+            select(func.count(self.model.id)).filter(self.model.status != 'ARCHIVED')
+        )
+        return result.scalar() or 0
+
+    async def count_all(self) -> int:
+        from sqlalchemy import func
+        result = await self.session.execute(
+            select(func.count(self.model.id))
+        )
+        return result.scalar() or 0
+
+    async def exists(self, id: str) -> bool:
+        obj = await self.get(id)
+        return obj is not None
+
     async def create(self, obj_in: Dict[str, Any]) -> ModelType:
         db_obj = self.model(**obj_in)
         self.session.add(db_obj)
