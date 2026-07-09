@@ -249,8 +249,13 @@ class TrainingOrchestrator:
                     online_store = get_online_store()
                     inv_count = await online_store.invalidate_dataset_features(dataset=dataset_name)
                     logger.info(f"Invalidated {inv_count} outdated online feature vectors for dataset '{dataset_name}' after retraining.")
+                    
+                    # Also refresh model registry cache for this dataset champion
+                    from app.cache.model_cache import get_model_registry_cache
+                    model_cache = await get_model_registry_cache()
+                    await model_cache.refresh_champion_cache(dataset_name)
                 except Exception as e:
-                    logger.warning(f"Could not invalidate online features in Redis: {e}")
+                    logger.warning(f"Could not invalidate online features or refresh model cache in Redis: {e}")
                     
                 # Commit is deferred to the pipeline transaction
 

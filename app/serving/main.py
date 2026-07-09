@@ -74,10 +74,12 @@ def create_app() -> FastAPI:
     
     # 3. Mount Routers
     app.include_router(v1_router, prefix=f"/api/{serving_config.api_version}")
-    from app.serving.api.v1.endpoints import health
+    from app.serving.api.v1.endpoints import health, model_cache
     app.include_router(health.router, tags=["health"])
+    app.include_router(model_cache.router, tags=["model_cache"])
     
     return app
+
 
 # The standard ASGI entrypoint (e.g. `uvicorn app.serving.main:app`)
 app = create_app()

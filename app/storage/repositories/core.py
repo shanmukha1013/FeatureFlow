@@ -106,6 +106,52 @@ class ModelRepository(BaseRepository[Model]):
         )
         return result.scalars().all()
 
+    async def create(self, obj_in: Dict[str, Any]) -> Model:
+        db_obj = await super().create(obj_in)
+        try:
+            from app.cache.model_cache import get_model_registry_cache
+            cache = await get_model_registry_cache()
+            await cache.refresh_model_cache(db_obj.id)
+        except Exception:
+            pass
+        return db_obj
+
+    async def update(self, db_obj: Model, obj_in: Dict[str, Any]) -> Model:
+        res = await super().update(db_obj, obj_in)
+        try:
+            from app.cache.model_cache import get_model_registry_cache
+            cache = await get_model_registry_cache()
+            if res.status == 'ARCHIVED':
+                await cache.delete_model_cache(res.id, dataset=res.dataset_id)
+            else:
+                await cache.refresh_model_cache(res.id)
+        except Exception:
+            pass
+        return res
+
+    async def delete(self, id: Any) -> None:
+        target_id = id.id if hasattr(id, 'id') else id
+        ds_id = id.dataset_id if hasattr(id, 'dataset_id') else None
+        await super().delete(id)
+        try:
+            from app.cache.model_cache import get_model_registry_cache
+            cache = await get_model_registry_cache()
+            await cache.delete_model_cache(target_id, dataset=ds_id)
+        except Exception:
+            pass
+
+    async def hard_delete(self, id: Any) -> None:
+        target_id = id.id if hasattr(id, 'id') else id
+        ds_id = id.dataset_id if hasattr(id, 'dataset_id') else None
+        try:
+            from app.cache.model_cache import get_model_registry_cache
+            cache = await get_model_registry_cache()
+            await cache.delete_model_cache(target_id, dataset=ds_id)
+        except Exception:
+            pass
+        await super().hard_delete(id)
+
+
 class ChampionModelRepository(BaseRepository[ChampionModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(ChampionModel, session)
@@ -121,6 +167,41 @@ class ChampionModelRepository(BaseRepository[ChampionModel]):
             )
         )
         return result.scalars().first()
+
+    async def create(self, obj_in: Dict[str, Any]) -> ChampionModel:
+        db_obj = await super().create(obj_in)
+        try:
+            from app.cache.model_cache import get_model_registry_cache
+            cache = await get_model_registry_cache()
+            if db_obj.dataset_id:
+                await cache.refresh_champion_cache(db_obj.dataset_id)
+        except Exception:
+            pass
+        return db_obj
+
+    async def update(self, db_obj: ChampionModel, obj_in: Dict[str, Any]) -> ChampionModel:
+        res = await super().update(db_obj, obj_in)
+        try:
+            from app.cache.model_cache import get_model_registry_cache
+            cache = await get_model_registry_cache()
+            if res.dataset_id:
+                await cache.refresh_champion_cache(res.dataset_id)
+        except Exception:
+            pass
+        return res
+
+    async def delete(self, id: Any) -> None:
+        target_obj = id if hasattr(id, 'dataset_id') else await self.get(id)
+        ds_id = target_obj.dataset_id if target_obj else None
+        await super().delete(id)
+        if ds_id:
+            try:
+                from app.cache.model_cache import get_model_registry_cache
+                cache = await get_model_registry_cache()
+                await cache.delete_model_cache("", dataset=ds_id)
+            except Exception:
+                pass
+
 
 class ExperimentRepository(BaseRepository[Experiment]):
     def __init__(self, session: AsyncSession):

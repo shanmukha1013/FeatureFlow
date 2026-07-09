@@ -45,10 +45,18 @@ class PredictionEngine:
         }
 
     async def start(self):
-        """Warms up the engine by loading CHAMPION models from DB into memory."""
+        """Warms up the engine by loading CHAMPION models from DB into memory and synchronizing Redis Model Registry Cache."""
         logger.info("Initializing Prediction Engine.")
         
         champion_meta = None
+        
+        # Requirement 3: Synchronize/Check Redis Model Registry Cache on startup
+        try:
+            from app.cache.model_cache import get_model_registry_cache
+            model_cache = await get_model_registry_cache()
+            await model_cache.refresh_all_caches()
+        except Exception as cache_e:
+            logger.warning(f"Could not warm up Redis model registry cache on startup: {cache_e}")
         
         async with AsyncSessionLocal() as session:
             champion_repo = ChampionModelRepository(session)
@@ -56,6 +64,7 @@ class PredictionEngine:
             
             # Load all champions via repository
             champions = await champion_repo.get_all()
+
             
             active_models = []
             for c in champions:
@@ -138,8 +147,32 @@ class PredictionEngine:
             else:
                 model_id, version = self.routing_registry.get(alias, (None, None))
                 if not model_id:
+                    # Check Redis model registry cache first (Requirement 3)
+                    try:
+                        from app.cache.model_cache import get_model_registry_cache
+                        mcache = await get_model_registry_cache()
+                        cdata, src = await mcache.get_champion_with_fallback(alias)
+                        if cdata:
+                            model_id = cdata.get("model_id")
+                        else:
+                            mdata, src = await mcache.get_model_with_fallback(alias)
+                            if mdata:
+                                model_id = mdata.get("id")
+                    except Exception as mce:
+                        logger.warning(f"Model cache lookup failed for alias '{alias}': {mce}")
+
+                if not model_id:
                     raise InferenceError(f"Alias {alias} not found in routing registry.")
                 
+            # Requirement 3: Check Redis first for model & metadata, fall back to PostgreSQL, repopulate, serve without interruption
+            try:
+                from app.cache.model_cache import get_model_registry_cache
+                mcache = await get_model_registry_cache()
+                await mcache.get_model_with_fallback(model_id)
+                await mcache.get_metadata_with_fallback(model_id)
+            except Exception as cache_err:
+                logger.warning(f"Error accessing Model Registry Cache during prediction for {model_id}: {cache_err}")
+
             predictor = self.predictors.get(model_id)
             
             if not predictor:

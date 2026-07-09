@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.serving.api.v1.endpoints import predict, health, models, version, features
+from app.serving.api.v1.endpoints import predict, health, models, version, features, model_cache
 from app.serving.api.v1.management.router import management_router
 
 v1_router = APIRouter()
@@ -9,5 +9,7 @@ v1_router.include_router(health.router, tags=["health"])
 v1_router.include_router(models.router, tags=["models"])
 v1_router.include_router(version.router, tags=["version"])
 v1_router.include_router(features.router, tags=["features"])
+v1_router.include_router(model_cache.router, tags=["model_cache"])
 v1_router.include_router(management_router)
+
 
