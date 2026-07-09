@@ -16,17 +16,9 @@ from app.storage.database import AsyncSessionLocal, init_db
 from app.serving.main import app
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create a single event loop for the entire test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def setup_database():
-    """Initialize database tables before tests run."""
+    """Initialize database tables within the active function loop."""
     await init_db()
     yield
 

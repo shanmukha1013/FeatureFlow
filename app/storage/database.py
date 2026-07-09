@@ -13,18 +13,28 @@ if not settings.database_url:
     sys.exit(1)
 
 # Create the async SQLAlchemy engine
-# pool_pre_ping enables connection verification on checkout (handles reconnects gracefully)
+# When running under pytest, NullPool ensures database connections are never cached or shared across event loops
 try:
-    engine = create_async_engine(
-        settings.database_url,
-        echo=False,
-        future=True,
-        pool_pre_ping=True,      # verify connections before checkout
-        pool_size=20,            # handle more concurrent requests
-        max_overflow=40,         # allow spikes in connections
-        pool_timeout=30,         # wait up to 30s before giving up
-        pool_recycle=1800,       # recycle connections older than 30 mins
-    )
+    import os
+    if "pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") or settings.environment.lower() == "test":
+        from sqlalchemy.pool import NullPool
+        engine = create_async_engine(
+            settings.database_url,
+            echo=False,
+            future=True,
+            poolclass=NullPool,
+        )
+    else:
+        engine = create_async_engine(
+            settings.database_url,
+            echo=False,
+            future=True,
+            pool_pre_ping=True,      # verify connections before checkout
+            pool_size=20,            # handle more concurrent requests
+            max_overflow=40,         # allow spikes in connections
+            pool_timeout=30,         # wait up to 30s before giving up
+            pool_recycle=1800,       # recycle connections older than 30 mins
+        )
 except Exception as e:
     logger.exception(f"Failed to initialize database engine: {e}")
     sys.exit(1)

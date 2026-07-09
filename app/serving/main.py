@@ -31,7 +31,10 @@ async def lifespan(app: FastAPI):
         discovery = DatasetDiscovery()
         discovery.discover_datasets()
         
-    threading.Thread(target=run_discovery, daemon=True).start()
+    import sys, os
+    from app.config import settings
+    if "pytest" not in sys.modules and not os.getenv("PYTEST_CURRENT_TEST") and settings.environment.lower() != "test":
+        threading.Thread(target=run_discovery, daemon=True).start()
     yield
 
 def create_app() -> FastAPI:
