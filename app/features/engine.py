@@ -139,7 +139,37 @@ class FeatureEngineeringEngine:
             severity="INFO",
             payload={"dataset": dataset_record.name, "features_engineered": features_generated, "time_ms": exec_time}
         ))
-        # Ensure final audit log commits
-        # Commit is deferred to the pipeline transaction
+        
+        # Requirement 1: After Feature Engineering completes, automatically write every engineered feature into Redis
+        try:
+            from app.cache.online_store import get_online_store
+            from app.storage.repositories.core import FeatureValueRepository
+            online_store = get_online_store()
+            fv_repo = FeatureValueRepository(session)
+            fvs = await fv_repo.get_by_dataset(dataset_record.id)
+            entity_map = {}
+            max_version = 1
+            for fv in fvs:
+                if fv.entity_id not in entity_map:
+                    entity_map[fv.entity_id] = {}
+                if fv.feature and fv.feature.name:
+                    val = fv.value_json
+                    if isinstance(val, dict) and "value" in val:
+                        entity_map[fv.entity_id][fv.feature.name] = val["value"]
+                    else:
+                        entity_map[fv.entity_id][fv.feature.name] = val
+                if fv.version and fv.version > max_version:
+                    max_version = fv.version
+            if entity_map:
+                await online_store.store_online_features_batch(
+                    dataset=dataset_record.name,
+                    entity_features_map=entity_map,
+                    feature_version=max_version,
+                    dataset_version=dataset_record.version or 1
+                )
+                logger.info(f"Automatically wrote {len(entity_map)} entity feature vectors to Redis Online Store.")
+        except Exception as e:
+            logger.warning(f"Could not sync online features to Redis after Feature Engineering: {e}")
         
         logger.info(f"Feature Engineering complete for {dataset_record.name}. Generated {features_generated} features in {exec_time}ms.")
+

@@ -74,21 +74,25 @@ class BaseRepository(Generic[ModelType]):
         await self.session.refresh(db_obj)
         return db_obj
 
-    async def delete(self, id: str) -> None:
+    async def delete(self, id: Any) -> None:
         """Soft delete the record by setting status to ARCHIVED."""
+        target_id = id.id if hasattr(id, 'id') else id
         await self.session.execute(
-            update(self.model).where(self.model.id == id).values(status='ARCHIVED')
+            update(self.model).where(self.model.id == target_id).values(status='ARCHIVED')
         )
         await self.session.flush()
         
-    async def restore(self, id: str) -> None:
+    async def restore(self, id: Any) -> None:
         """Restore an archived record back to ACTIVE status."""
+        target_id = id.id if hasattr(id, 'id') else id
         await self.session.execute(
-            update(self.model).where(self.model.id == id).values(status='ACTIVE')
+            update(self.model).where(self.model.id == target_id).values(status='ACTIVE')
         )
         await self.session.flush()
         
-    async def hard_delete(self, id: str) -> None:
+    async def hard_delete(self, id: Any) -> None:
         """Permanently remove a record from the database. Use with extreme caution."""
-        await self.session.execute(delete(self.model).where(self.model.id == id))
+        target_id = id.id if hasattr(id, 'id') else id
+        await self.session.execute(delete(self.model).where(self.model.id == target_id))
         await self.session.flush()
+

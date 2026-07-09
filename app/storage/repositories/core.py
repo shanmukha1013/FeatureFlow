@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.storage.repositories.base import BaseRepository
 from app.storage.models import (
-    Dataset, DatasetVersion, Feature, Model, 
+    Dataset, DatasetVersion, Feature, FeatureValue, Model, 
     ChampionModel, Experiment, PipelineRun, AuditLog
 )
 
@@ -52,6 +52,31 @@ class FeatureRepository(BaseRepository[Feature]):
             select(Feature)
             .options(selectinload(Feature.dataset))
             .filter(Feature.dataset_id == dataset_id, Feature.status != 'ARCHIVED')
+        )
+        return result.scalars().all()
+
+class FeatureValueRepository(BaseRepository[FeatureValue]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(FeatureValue, session)
+
+    async def get_by_entity(self, entity_id: str, dataset_id: Optional[str] = None) -> List[FeatureValue]:
+        from sqlalchemy.orm import selectinload
+        query = select(FeatureValue).options(selectinload(FeatureValue.feature)).filter(
+            FeatureValue.entity_id == entity_id,
+            FeatureValue.status != 'ARCHIVED'
+        )
+        if dataset_id:
+            query = query.join(FeatureValue.feature).filter(Feature.dataset_id == dataset_id)
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_by_dataset(self, dataset_id: str) -> List[FeatureValue]:
+        from sqlalchemy.orm import selectinload
+        result = await self.session.execute(
+            select(FeatureValue)
+            .options(selectinload(FeatureValue.feature))
+            .join(FeatureValue.feature)
+            .filter(Feature.dataset_id == dataset_id, FeatureValue.status != 'ARCHIVED')
         )
         return result.scalars().all()
 

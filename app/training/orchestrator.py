@@ -243,8 +243,18 @@ class TrainingOrchestrator:
                     await AuditLogger.record(session, AuditEvent(event_name="CHAMPION_PROMOTED", component="TrainingOrchestrator", severity="INFO", payload={"new_champion": best_candidate.id, "accuracy": best_acc}))
                     logger.info(f"Initial champion promoted: {best_candidate.id}")
                     
+                # Requirement 7: Automatically invalidate outdated feature versions after retraining
+                try:
+                    from app.cache.online_store import get_online_store
+                    online_store = get_online_store()
+                    inv_count = await online_store.invalidate_dataset_features(dataset=dataset_name)
+                    logger.info(f"Invalidated {inv_count} outdated online feature vectors for dataset '{dataset_name}' after retraining.")
+                except Exception as e:
+                    logger.warning(f"Could not invalidate online features in Redis: {e}")
+                    
                 # Commit is deferred to the pipeline transaction
 
         except Exception as e:
             await session.rollback()
             logger.error(f"Training orchestration failed for dataset {dataset_name}: {e}")
+

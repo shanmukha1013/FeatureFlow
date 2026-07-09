@@ -35,6 +35,8 @@ class Settings:
     redis_url: str = os.getenv("REDIS_URL", "redis://default:SIrbAOnl0X1prNZQ5qycQik1mDhk16KC@cup-calculator-relation-56972.db.redis.io:14389")
     redis_pool_size: int = int(os.getenv("REDIS_POOL_SIZE", "20"))
     redis_timeout: float = float(os.getenv("REDIS_TIMEOUT", "5.0"))
+    redis_feature_ttl: int = int(os.getenv("REDIS_FEATURE_TTL", "86400"))
+
 
     def __post_init__(self):
         if not self.database_url:

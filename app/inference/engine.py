@@ -149,7 +149,34 @@ class PredictionEngine:
                 await AuditLogger.record(session, AuditEvent(event_name="PREDICTION_STARTED", component="PredictionEngine", severity="INFO", payload={"request_id": request.request_id}))
                 await session.commit()
             
-            response = predictor.predict(request)
+            # Requirement 4: Query Redis Online Feature Store before prediction.
+            # If hit, use immediately. If miss, load from PostgreSQL, reconstruct, store in Redis, return.
+            enhanced_request = request
+            if request.entity_id and predictor.metadata and predictor.metadata.dataset_id:
+                try:
+                    from app.cache.online_store import get_online_store
+                    online_store = get_online_store()
+                    dataset_key = predictor.metadata.dataset_id
+                    if predictor.features_meta and len(predictor.features_meta) > 0 and getattr(predictor.features_meta[0], "dataset", None):
+                        dataset_key = predictor.features_meta[0].dataset.name or dataset_key
+                        
+                    online_payload, source = await online_store.get_online_features_with_fallback(dataset_key, request.entity_id)
+                    if online_payload and isinstance(online_payload.get("values"), dict):
+                        merged_features = dict(online_payload["values"])
+                        merged_features.update(request.features)
+                        from app.inference.request import PredictionRequest
+                        enhanced_request = PredictionRequest(
+                            entity_id=request.entity_id,
+                            features=merged_features,
+                            request_id=request.request_id,
+                            timestamp=request.timestamp
+                        )
+                        logger.info(f"Using online feature vector (source: {source}) for entity {request.entity_id}.")
+                except Exception as cache_e:
+                    logger.warning(f"Error checking online feature store during prediction for {request.entity_id}: {cache_e}")
+
+            response = predictor.predict(enhanced_request)
+
             
             async with AsyncSessionLocal() as session:
                 await AuditLogger.record(session, AuditEvent(event_name="PREDICTION_FINISHED", component="PredictionEngine", severity="INFO", payload={"request_id": request.request_id, "latency_ms": response.latency_ms}))
