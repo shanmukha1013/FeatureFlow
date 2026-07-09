@@ -39,6 +39,8 @@ class Settings:
         # Ensure we use asyncpg for PostgreSQL URLs
         if self.database_url.startswith("postgresql://"):
             object.__setattr__(self, 'database_url', self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1))
+        elif self.database_url.startswith("postgres://"):
+            object.__setattr__(self, 'database_url', self.database_url.replace("postgres://", "postgresql+asyncpg://", 1))
 
     @property
     def is_production(self) -> bool:

@@ -147,11 +147,13 @@ class PredictionEngine:
                 
             async with AsyncSessionLocal() as session:
                 await AuditLogger.record(session, AuditEvent(event_name="PREDICTION_STARTED", component="PredictionEngine", severity="INFO", payload={"request_id": request.request_id}))
+                await session.commit()
             
             response = predictor.predict(request)
             
             async with AsyncSessionLocal() as session:
                 await AuditLogger.record(session, AuditEvent(event_name="PREDICTION_FINISHED", component="PredictionEngine", severity="INFO", payload={"request_id": request.request_id, "latency_ms": response.latency_ms}))
+                await session.commit()
             
             self.stats["prediction_count"] += 1
             self.stats["total_latency_ms"] += response.latency_ms
@@ -163,6 +165,7 @@ class PredictionEngine:
             logger.error(f"Prediction failed on primary path: {e}")
             async with AsyncSessionLocal() as session:
                 await AuditLogger.record(session, AuditEvent(event_name="PREDICTION_FAILED", component="PredictionEngine", severity="ERROR", payload={"error": str(e), "request_id": request.request_id}))
+                await session.commit()
             
             fallback_predictor = None
             for pid, p in self.predictors.items():
@@ -174,6 +177,7 @@ class PredictionEngine:
                 logger.warning(f"Initiating fallback to {fallback_predictor.model_id}")
                 async with AsyncSessionLocal() as session:
                     await AuditLogger.record(session, AuditEvent(event_name="FALLBACK_ACTIVATED", component="PredictionEngine", severity="WARNING", payload={"fallback_model_id": fallback_predictor.model_id}))
+                    await session.commit()
                 try:
                     response = fallback_predictor.predict(request)
                     self.stats["prediction_count"] += 1
