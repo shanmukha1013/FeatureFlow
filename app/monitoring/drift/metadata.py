@@ -3,11 +3,13 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List
 from enum import Enum
 
+
 class DriftSeverity(str, Enum):
     INFO = "INFO"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
     NONE = "NONE"
+
 
 @dataclass(frozen=True)
 class DriftAlert:
@@ -16,6 +18,7 @@ class DriftAlert:
     drift_score: float
     metric: str
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 @dataclass(frozen=True)
 class DriftReport:

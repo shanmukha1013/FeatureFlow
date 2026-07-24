@@ -1,8 +1,12 @@
+import pytest
+
+pytestmark = pytest.mark.integration
+
 """
 Integration tests for FeatureFlow FastAPI endpoints.
 Tests run against the real async PostgreSQL infrastructure and endpoints.
 """
-import pytest
+
 
 @pytest.mark.asyncio
 async def test_health_check(client):
@@ -10,6 +14,7 @@ async def test_health_check(client):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
+
 
 @pytest.mark.asyncio
 async def test_version_check(client):
@@ -19,6 +24,7 @@ async def test_version_check(client):
     assert "platform_version" in data
     assert data["api_version"] == "v1"
 
+
 @pytest.mark.asyncio
 async def test_list_models(client):
     response = await client.get("/api/v1/models")
@@ -26,6 +32,7 @@ async def test_list_models(client):
     data = response.json()
     assert "aliases" in data
     assert isinstance(data["aliases"], list)
+
 
 @pytest.mark.asyncio
 async def test_management_overview(client):
@@ -86,4 +93,3 @@ async def test_predict_endpoint_validation_error(client):
     # Missing required payload structure
     response = await client.post("/api/v1/predict", json={})
     assert response.status_code in (400, 422, 500)
-

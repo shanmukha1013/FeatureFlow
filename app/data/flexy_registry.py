@@ -2,10 +2,11 @@
 Official Schema Registration for the Flexy Marketplace Dataset.
 
 Defines the explicit domain models and storage configurations for the 13 official
-marketplace tables. Ensures the Data Layer strictly validates all ingested files 
+marketplace tables. Ensures the Data Layer strictly validates all ingested files
 against these deterministic contracts.
 """
 from app.data.schema import DatasetSchema, ColumnSchema, SchemaRegistry
+
 
 def register_flexy_schemas(registry: SchemaRegistry) -> None:
     schemas = [
@@ -160,9 +161,10 @@ def register_flexy_schemas(registry: SchemaRegistry) -> None:
             ]
         )
     ]
-    
+
     for s in schemas:
         registry.register(s)
+
 
 # Global Schema Registry for Dataset Discovery
 registry = SchemaRegistry()

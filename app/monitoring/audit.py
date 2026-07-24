@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.monitoring.config import monitoring_config
 
+
 @dataclass(frozen=True)
 class AuditEvent:
     """
@@ -28,6 +29,7 @@ class AuditEvent:
             "severity": self.severity,
             "payload": self.payload
         }
+
 
 class AuditLogger:
     """

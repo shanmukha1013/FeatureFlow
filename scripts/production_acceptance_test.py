@@ -24,28 +24,11 @@ Executes comprehensive engineering verification across all 20 core subsystems:
 19. API Availability
 20. Docker Compatibility
 """
-import asyncio
-import os
-import sys
-import time
-import pandas as pd
-from typing import Dict, Any, List
-
-# Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from httpx import AsyncClient, ASGITransport
-
-from app.storage.database import AsyncSessionLocal, init_db, engine
-from app.storage.models import (
-    Dataset as DatasetModel,
-    Feature as FeatureModel,
-    Model as ModelModel,
-    Experiment as ExperimentModel,
-    AuditLog as AuditLogModel,
-)
+from app.serving.main import app
+from app.inference.engine import PredictionEngine
+from app.training.artifacts import LocalArtifactStore
+from app.data.loader import CSVDataLoader
+from app.data.discovery import DatasetDiscovery
 from app.storage.repositories.core import (
     DatasetRepository,
     FeatureRepository,
@@ -53,28 +36,34 @@ from app.storage.repositories.core import (
     ChampionModelRepository,
     ExperimentRepository,
 )
-from app.data.discovery import DatasetDiscovery
-from app.data.loader import CSVDataLoader
-from app.data.validator import DataValidator
-from app.data.profiler import DataProfiler
-from app.features.engine import FeatureEngineeringEngine
-from app.training.orchestrator import TrainingOrchestrator
-from app.training.artifacts import LocalArtifactStore
-from app.inference.engine import PredictionEngine
-from app.inference.request import PredictionRequest
-from app.serving.main import app
+from app.storage.models import (
+    AuditLog as AuditLogModel,
+)
+from app.storage.database import AsyncSessionLocal, init_db
+from httpx import AsyncClient, ASGITransport
+from sqlalchemy.future import select
+import asyncio
+import os
+import sys
+from typing import Dict
+
+# Add project root to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 results: Dict[str, str] = {}
+
 
 def record_result(name: str, status: str = "PASS"):
     results[name] = status
     print(f"[{status}] {name}")
 
+
 async def run_acceptance_tests():
     print("==================================================")
     print("STARTING FEATUREFLOW PRODUCTION ACCEPTANCE SUITE")
     print("==================================================")
-    
+
     # 1. Database Connection & Table Initialization
     try:
         await init_db()
@@ -90,7 +79,7 @@ async def run_acceptance_tests():
             feat_repo = FeatureRepository(session)
             model_repo = ModelRepository(session)
             champ_repo = ChampionModelRepository(session)
-            exp_repo = ExperimentRepository(session)
+            ExperimentRepository(session)
             record_result("Connection Pool", "PASS")
             record_result("Repository Layer", "PASS")
         except Exception as e:
@@ -126,33 +115,33 @@ async def run_acceptance_tests():
             discovered = await discovery._async_discover_datasets()
             assert len(discovered) > 0, "No raw CSV datasets discovered"
             record_result("Dataset Discovery", "PASS")
-            
+
             # Pick target dataset and verify pipeline results stored in PostgreSQL
             target_ds = discovered[0]
             for ds in discovered:
                 if ds.name in ["orders", "items", "categories", "auctions", "bids"]:
                     target_ds = ds
                     break
-                    
+
             assert target_ds.status in ["VALID", "INVALID"], f"Dataset status is {target_ds.status}"
             record_result("Validation", "PASS")
             record_result("Profiling", "PASS")
-            
+
             features = await feat_repo.get_by_dataset(target_ds.id)
             assert len(features) > 0, f"No features found in DB for {target_ds.name}"
             record_result("Feature Engineering", "PASS")
             record_result("Feature Registry", "PASS")
-            
+
             models = await model_repo.get_by_dataset(target_ds.id)
             assert len(models) > 0, f"No models found in DB for {target_ds.name}"
             record_result("Model Training", "PASS")
             record_result("Experiment Tracking", "PASS")
             record_result("Model Registry", "PASS")
-            
+
             champ = await champ_repo.get_by_dataset(target_ds.id)
             assert champ is not None, f"No champion model found for {target_ds.name}"
             record_result("Champion Selection", "PASS")
-            
+
             loader = CSVDataLoader()
             df = loader.load(f"raw/{target_ds.name}.csv")
         except Exception as e:
@@ -172,7 +161,7 @@ async def run_acceptance_tests():
                 store = LocalArtifactStore()
                 pred_engine = PredictionEngine(store)
                 await pred_engine.start()
-                
+
                 # Take first row and run prediction using target dataset's champion model
                 sample_row = df.iloc[0].to_dict()
                 target_alias = champ.model_id if champ else (pred_engine.default_alias or "default")

@@ -20,20 +20,21 @@ from app.serving.config import serving_config
 
 router = APIRouter()
 
+
 @router.get("/platform", response_model=PlatformOverviewSchema)
 async def get_platform_overview(session: AsyncSession = Depends(get_db)):
     health = HealthMonitor.check_health()
-    
+
     # Compute from database
     result_datasets = await session.execute(select(func.count(Dataset.id)))
     num_datasets = result_datasets.scalar_one()
-    
+
     result_features = await session.execute(select(func.count(Feature.id)))
     num_features = result_features.scalar_one()
-    
+
     result_models = await session.execute(select(func.count(Model.id)))
     num_models = result_models.scalar_one()
-    
+
     result_experiments = await session.execute(select(func.count(Experiment.id)))
     num_pipelines = result_experiments.scalar_one()
 
@@ -50,6 +51,7 @@ async def get_platform_overview(session: AsyncSession = Depends(get_db)):
         inference_status="ACTIVE"
     )
 
+
 @router.get("/system", response_model=SystemInfoSchema)
 async def get_system_info():
     return SystemInfoSchema(
@@ -62,33 +64,34 @@ async def get_system_info():
         training_backend="sklearn"
     )
 
+
 @router.get("/statistics", response_model=StatisticsSchema)
 async def get_statistics(session: AsyncSession = Depends(get_db)):
     total_preds = 0
     avg_latency = 0.0
     val_failures = 0
-    
+
     from app.storage.models import AuditLog
-    
+
     # Total Predictions
     pred_res = await session.execute(select(AuditLog).filter(AuditLog.event_name == 'PREDICTION_FINISHED'))
     preds = pred_res.scalars().all()
     total_preds = len(preds)
-    
+
     if total_preds > 0:
         total_time = sum([p.payload.get("latency_ms", 0) for p in preds if p.payload])
         avg_latency = total_time / total_preds
-        
+
     # Validation Failures
     val_res = await session.execute(select(AuditLog).filter(AuditLog.event_name == 'VALIDATION_FAILED'))
     val_failures = len(val_res.scalars().all())
-        
+
     result_models = await session.execute(select(func.count(Model.id)))
     num_models = result_models.scalar_one()
-    
+
     result_pipelines = await session.execute(select(func.count(Experiment.id)))
     num_pipelines = result_pipelines.scalar_one()
-    
+
     return StatisticsSchema(
         total_predictions=total_preds,
         average_latency=avg_latency,
@@ -97,6 +100,7 @@ async def get_statistics(session: AsyncSession = Depends(get_db)):
         inference_count=total_preds,
         validation_failures=val_failures
     )
+
 
 @router.get("/about", response_model=AboutSchema)
 async def get_about():
@@ -109,6 +113,7 @@ async def get_about():
         repository="internal/featureflow",
         build_timestamp=datetime.now(timezone.utc).isoformat()
     )
+
 
 @router.get("/config", response_model=ConfigSchema)
 async def get_config():

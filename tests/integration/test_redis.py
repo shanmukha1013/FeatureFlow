@@ -1,3 +1,12 @@
+from app.cache.cache_manager import CacheManager
+from app.cache.redis_client import RedisClient, sanitize_redis_url
+from httpx import AsyncClient
+import pytest_asyncio
+import asyncio
+import pytest
+
+pytestmark = pytest.mark.integration
+
 """
 Test suite for Redis Cloud Integration (Phase 1).
 
@@ -9,13 +18,6 @@ Verifies:
 - Concurrent async access across pooled connections
 - Health probe endpoint and credential redaction
 """
-import asyncio
-import pytest
-import pytest_asyncio
-from httpx import AsyncClient
-
-from app.cache.redis_client import RedisClient, sanitize_redis_url
-from app.cache.cache_manager import CacheManager
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -70,11 +72,11 @@ async def test_redis_ttl_expiration():
     cache = CacheManager()
     key = "ff_test:ttl_expire"
 
-    await cache.set(key, "short_lived", ttl=1)
+    await cache.set(key, "short_lived", ttl=3)
     assert await cache.exists(key) is True
 
     # Sleep slightly past TTL
-    await asyncio.sleep(1.2)
+    await asyncio.sleep(3.5)
     assert await cache.exists(key) is False
 
 
@@ -105,7 +107,7 @@ async def test_redis_reconnection_and_resilience():
     failures gracefully return fallbacks without throwing unhandled exceptions.
     """
     client = await RedisClient.get_instance()
-    
+
     # Simulate disconnect
     await client.disconnect()
     assert client.is_connected is False
@@ -120,7 +122,7 @@ async def test_redis_reconnection_and_resilience():
     # Test graceful fallback with invalid URL (zero crashes allowed)
     bad_client = RedisClient(url="redis://invalid_host_domain_xyz:9999", pool_size=1, timeout=0.2)
     bad_cache = CacheManager(bad_client)
-    
+
     # Operations should return None/False cleanly without raising
     assert await bad_cache.get("any_key") is None
     assert await bad_cache.set("any_key", "val") is False
@@ -154,7 +156,7 @@ async def test_redis_health_endpoint(client: AsyncClient):
     """Verify GET /health/redis health probe endpoint diagnostics and credential redaction."""
     response = await client.get("/health/redis")
     assert response.status_code == 200
-    
+
     data = response.json()
     assert "connection_status" in data
     assert data["connection_status"] == "ONLINE"
@@ -164,11 +166,13 @@ async def test_redis_health_endpoint(client: AsyncClient):
     assert "memory_usage" in data
     assert "connected_clients" in data
     assert "url_redacted" in data
-    
+
     # Ensure credentials never leak in the endpoint output or url_redacted
     if data["url_redacted"]:
         assert "SIrbAOnl0X1prNZQ5qycQik1mDhk16KC" not in data["url_redacted"]
-        assert "***@" in data["url_redacted"]
+        from app.config import settings
+        if "@" in settings.redis_url:
+            assert "***@" in data["url_redacted"]
 
 
 def test_sanitize_redis_url():

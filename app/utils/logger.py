@@ -1,7 +1,7 @@
 """
 Standardized logging infrastructure for FeatureFlow.
 
-Ensures that logs are formatted consistently across modules and respect 
+Ensures that logs are formatted consistently across modules and respect
 the globally configured logging level.
 """
 import logging
@@ -12,6 +12,7 @@ import os
 
 _LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - [%(funcName)s] %(message)s"
 _DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
+
 
 def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
     """
@@ -25,7 +26,7 @@ def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
         A fully configured logging.Logger instance.
     """
     logger: logging.Logger = logging.getLogger(name)
-    
+
     # Avoid attaching multiple handlers to the same logger during tests or reloading
     if logger.hasHandlers():
         return logger
@@ -38,12 +39,12 @@ def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
     # Attach standard console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(active_level)
-    
+
     formatter = logging.Formatter(fmt=_LOG_FORMAT, datefmt=_DATE_FORMAT)
     console_handler.setFormatter(formatter)
-    
+
     logger.addHandler(console_handler)
-    
+
     # Prevent propagation to the root logger to avoid duplicate log entries
     logger.propagate = False
 

@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import Dict, Any
 
+
 class BaselineProfiler:
     """
     Extracts a statistical baseline profile from training data.
@@ -8,7 +9,7 @@ class BaselineProfiler:
     @staticmethod
     def compute_baseline(X: pd.DataFrame, y: pd.Series) -> Dict[str, Any]:
         baseline = {}
-        
+
         # Features
         for col in X.columns:
             series = X[col]
@@ -32,7 +33,7 @@ class BaselineProfiler:
                     "unique_count": int(series.nunique()),
                     "frequencies": series.value_counts(normalize=True).to_dict()
                 }
-                
+
         # Target
         if pd.api.types.is_numeric_dtype(y):
             baseline["_target"] = {
@@ -45,5 +46,5 @@ class BaselineProfiler:
                 "type": "categorical",
                 "frequencies": y.value_counts(normalize=True).to_dict()
             }
-            
+
         return baseline

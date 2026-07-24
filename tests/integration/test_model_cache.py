@@ -1,3 +1,20 @@
+from app.storage.repositories.core import (
+    DatasetRepository,
+    ModelRepository,
+    ChampionModelRepository,
+    ExperimentRepository,
+    FeatureRepository
+)
+from app.storage.database import AsyncSessionLocal
+from app.cache.model_cache import get_model_registry_cache
+from app.cache.redis_client import RedisClient
+from httpx import AsyncClient
+import pytest_asyncio
+import uuid
+import pytest
+
+pytestmark = pytest.mark.integration
+
 """
 Integration tests for Phase 3: Redis Model Registry Cache.
 
@@ -10,23 +27,6 @@ Proves:
 - Cache invalidation on model archiving/deletion
 - REST API verification
 """
-import asyncio
-import uuid
-import pytest
-import pytest_asyncio
-from httpx import AsyncClient
-
-from app.cache.redis_client import RedisClient
-from app.cache.model_cache import ModelRegistryCache, get_model_registry_cache
-from app.storage.database import AsyncSessionLocal
-from app.storage.repositories.core import (
-    DatasetRepository,
-    ModelRepository,
-    ChampionModelRepository,
-    ExperimentRepository,
-    FeatureRepository
-)
-from app.storage.models import ModelVersion
 
 
 @pytest_asyncio.fixture(autouse=True)

@@ -1,3 +1,15 @@
+from app.storage.repositories.core import DatasetRepository, FeatureRepository, FeatureValueRepository
+from app.storage.database import AsyncSessionLocal
+from app.cache.online_store import OnlineFeatureStore
+from app.cache.redis_client import RedisClient
+from httpx import AsyncClient
+import pytest_asyncio
+import uuid
+import asyncio
+import pytest
+
+pytestmark = pytest.mark.integration
+
 """
 Integration tests for Phase 2: Redis Online Feature Store.
 
@@ -11,16 +23,6 @@ Proves:
 - Version invalidation on dataset/model updates
 - REST API endpoint verification
 """
-import asyncio
-import uuid
-import pytest
-import pytest_asyncio
-from httpx import AsyncClient
-
-from app.cache.redis_client import RedisClient
-from app.cache.online_store import OnlineFeatureStore, get_online_store
-from app.storage.database import AsyncSessionLocal
-from app.storage.repositories.core import DatasetRepository, FeatureRepository, FeatureValueRepository
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -68,7 +70,6 @@ async def test_postgresql_fallback_and_repopulation():
     store = OnlineFeatureStore()
     dataset_name = f"ff_test_fallback_ds_{uuid.uuid4().hex[:8]}"
     entity_id = f"customer_{uuid.uuid4().hex[:6]}"
-
 
     # Setup PostgreSQL offline feature store records
     async with AsyncSessionLocal() as session:
@@ -155,8 +156,6 @@ async def test_ttl_expiration():
 
     await asyncio.sleep(3.5)
     assert await store.get_online_features(dataset, entity_id, track_stats=False) is None
-
-
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,7 @@
 """
 Public interface for the Data Layer.
 
-Aggregates classes and exceptions to provide a clean import boundary 
+Aggregates classes and exceptions to provide a clean import boundary
 for external consumers.
 """
 from .exceptions import (

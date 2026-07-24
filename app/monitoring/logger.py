@@ -10,10 +10,12 @@ from datetime import datetime, timezone
 # Context variable to hold trace ID across async execution boundaries
 correlation_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("correlation_id", default="system")
 
+
 class StructuredJSONFormatter(logging.Formatter):
     """
     Overrides standard Python logging to emit 100% JSON logs.
     """
+
     def format(self, record: logging.LogRecord) -> str:
         log_obj = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -26,13 +28,14 @@ class StructuredJSONFormatter(logging.Formatter):
             log_obj["exc_info"] = self.formatException(record.exc_info)
         return json.dumps(log_obj)
 
+
 def setup_structured_logging() -> None:
     """
     Hijacks the root logger to strictly enforce JSON formatting platform-wide.
     """
     handler = logging.StreamHandler()
     handler.setFormatter(StructuredJSONFormatter())
-    
+
     root = logging.getLogger()
     root.handlers.clear()
     root.addHandler(handler)

@@ -8,6 +8,7 @@ from app.serving.dependencies import get_prediction_engine
 
 router = APIRouter()
 
+
 @router.get("/models", response_model=ModelsResponseSchema)
 def list_models(engine=Depends(get_prediction_engine)):
     """

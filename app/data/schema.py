@@ -1,7 +1,7 @@
 """
 Provides schema definitions for dataset structures.
 
-Ensures that incoming datasets adhere to strict contracts regarding 
+Ensures that incoming datasets adhere to strict contracts regarding
 required columns and data types before downstream processing.
 """
 from typing import Dict, List, Optional
@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
 
 @dataclass(frozen=True)
 class ColumnSchema:
@@ -27,6 +28,7 @@ class ColumnSchema:
         if not self.dtype.strip():
             raise ValueError("Column dtype cannot be empty or whitespace.")
 
+
 @dataclass(frozen=True)
 class DatasetSchema:
     """
@@ -36,7 +38,7 @@ class DatasetSchema:
     columns: List[ColumnSchema]
     version: str = "1.0.0"
     entity_id_column: str = "entity_id"
-    
+
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise ValueError("Dataset schema name cannot be empty.")
@@ -61,6 +63,7 @@ class SchemaRegistry:
     Centralized registry for dataset schemas.
     Allows dynamic registration and discovery of datasets without hardcoding.
     """
+
     def __init__(self) -> None:
         self._schemas: Dict[str, DatasetSchema] = {}
 

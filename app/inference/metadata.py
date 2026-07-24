@@ -1,11 +1,12 @@
 """
 Immutable models for tracking inference telemetry.
 
-Provides complete observability and auditability for every prediction 
+Provides complete observability and auditability for every prediction
 served by the platform.
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+
 
 @dataclass(frozen=True)
 class InferenceMetadata:

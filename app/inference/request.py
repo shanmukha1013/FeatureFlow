@@ -6,6 +6,7 @@ from typing import Dict, Any
 from datetime import datetime, timezone
 import uuid
 
+
 @dataclass(frozen=True)
 class PredictionRequest:
     """
@@ -15,3 +16,4 @@ class PredictionRequest:
     features: Dict[str, Any]
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    explain: bool = False

@@ -1,85 +1,120 @@
-"""
-SecurityManager: Stateless token validation for FeatureFlow.
-
-The security manager validates JWT tokens. User persistence is PostgreSQL.
-The in-memory mock-user table has been completely removed.
-
-Note: JWT is retained here only to maintain backward compatibility with the
-existing management router's token validation middleware. No new JWT
-features will be added (Phase 5 scope).
-"""
 import jwt
 import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
+from passlib.context import CryptContext
 from typing import Optional
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 
-from app.security.models import Role, Permission, ROLE_PERMISSIONS
+from app.config import settings
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-SECRET_KEY = "enterprise-mlops-secret-key-do-not-use-in-prod"
-ALGORITHM = "HS256"
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-class SecurityManager:
+def get_password_hash(password: str) -> str:
+    """Hashes a password using bcrypt according to settings."""
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifies a plaintext password against the hashed password."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def validate_password_strength(password: str) -> bool:
+    """Validates that password meets enterprise strength criteria."""
+    if len(password) < 8:
+        return False
+    if not any(char.isdigit() for char in password):
+        return False
+    if not any(char.isupper() for char in password):
+        return False
+    return True
+
+
+def generate_api_key() -> tuple[str, str]:
+    """Generates a raw API key and its hash for storage."""
+    raw_key = f"ff_{secrets.token_urlsafe(32)}"
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    return raw_key, key_hash
+
+
+def get_api_key_hash(raw_key: str) -> str:
+    """Hashes a raw API key for database lookup."""
+    return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+def create_access_token(user_id: str, username: str, expires_delta: Optional[timedelta] = None) -> str:
+    """Creates a short-lived JWT access token."""
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
+
+    # Use the first key for signing
+    signing_key = settings.jwt_secret_keys.split(",")[0].strip()
+
+    to_encode = {
+        "sub": str(user_id),
+        "username": username,
+        "type": "access",
+        "exp": expire
+    }
+    encoded_jwt = jwt.encode(to_encode, signing_key, algorithm=settings.jwt_algorithm)
+    return encoded_jwt
+
+
+def create_refresh_token(user_id: str, session_id: str, expires_delta: Optional[timedelta] = None) -> str:
+    """Creates a long-lived JWT refresh token bounded to a session."""
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
+
+    signing_key = settings.jwt_secret_keys.split(",")[0].strip()
+
+    to_encode = {
+        "sub": str(user_id),
+        "jti": session_id,
+        "type": "refresh",
+        "exp": expire
+    }
+    encoded_jwt = jwt.encode(to_encode, signing_key, algorithm=settings.jwt_algorithm)
+    return encoded_jwt
+
+
+def decode_token(token: str) -> dict:
     """
-    Provides stateless JWT token creation and validation.
-    Does NOT maintain any in-memory user state - PostgreSQL is the user store.
+    Decodes a JWT token, supporting key rotation by trying all keys.
+    Raises HTTPException on failure.
     """
+    keys = [k.strip() for k in settings.jwt_secret_keys.split(",") if k.strip()]
 
-    def hash_password(self, password: str) -> str:
-        return hashlib.sha256(password.encode()).hexdigest()
-
-    def create_token(self, username: str, role: str = "VIEWER") -> str:
-        """Creates a JWT token for the given username and role."""
-        expires = datetime.now(timezone.utc) + timedelta(hours=8)
-        payload = {
-            "sub": username,
-            "role": role,
-            "exp": expires
-        }
-        token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-        logger.info(f"Token issued for user: {username}")
-        return token
-
-    def validate_token(self, token: str, required_permission: Optional[Permission] = None) -> dict:
-        """
-        Validates a JWT token.
-
-        Returns:
-            dict with 'username' and 'role' keys.
-
-        Raises:
-            HTTPException 401/403 on invalid or expired tokens.
-        """
+    for idx, key in enumerate(keys):
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            username = payload.get("sub")
-            role_str = payload.get("role", "VIEWER")
-
-            if not username:
-                raise HTTPException(status_code=401, detail="Invalid token payload")
-
-            if required_permission:
-                try:
-                    role_enum = Role(role_str)
-                    perms = ROLE_PERMISSIONS.get(role_enum, [])
-                    if required_permission not in perms:
-                        logger.warning(f"Permission denied for {username}: {required_permission}")
-                        raise HTTPException(status_code=403, detail="Permission denied")
-                except ValueError:
-                    raise HTTPException(status_code=403, detail=f"Unknown role: {role_str}")
-
-            return {"username": username, "role": role_str}
-
+            payload = jwt.decode(token, key, algorithms=[settings.jwt_algorithm])
+            return payload
         except jwt.ExpiredSignatureError:
-            logger.warning("Token has expired")
-            raise HTTPException(status_code=401, detail="Token expired")
-        except jwt.InvalidTokenError as e:
-            logger.warning(f"Invalid token: {e}")
-            raise HTTPException(status_code=401, detail="Invalid token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has expired",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except jwt.InvalidTokenError:
+            # If this is the last key, it's truly invalid
+            if idx == len(keys) - 1:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Could not validate credentials",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            continue  # Try next key
 
-
-global_security_manager = SecurityManager()
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )

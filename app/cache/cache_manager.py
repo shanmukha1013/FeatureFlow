@@ -19,9 +19,10 @@ logger = get_logger(__name__)
 class CacheManager:
     """
     High-level cache abstraction for online feature serving and platform metadata caching.
-    
+
     All operations are asynchronous and safe against network failures.
     """
+
     def __init__(self, redis_client: Optional[RedisClient] = None):
         self.redis = redis_client or get_redis_client()
 
@@ -29,7 +30,7 @@ class CacheManager:
         """Retrieves a string value from cache by key. Returns None on cache miss or connection failure."""
         async def _op(client: aioredis.Redis) -> Optional[str]:
             return await client.get(key)
-            
+
         res = await self.redis.execute_with_retry(_op)
         return str(res) if res is not None else None
 
@@ -41,7 +42,7 @@ class CacheManager:
             else:
                 res = await client.set(name=key, value=str(value))
             return bool(res)
-            
+
         res = await self.redis.execute_with_retry(_op)
         return bool(res)
 
@@ -49,10 +50,10 @@ class CacheManager:
         """Deletes one or more keys from cache. Returns True if at least one key was deleted."""
         if not keys:
             return False
-            
+
         async def _op(client: aioredis.Redis) -> int:
             return await client.delete(*keys)
-            
+
         res = await self.redis.execute_with_retry(_op)
         return bool(res and res > 0)
 
@@ -60,7 +61,7 @@ class CacheManager:
         """Checks whether a key exists in cache."""
         async def _op(client: aioredis.Redis) -> int:
             return await client.exists(key)
-            
+
         res = await self.redis.execute_with_retry(_op)
         return bool(res and res > 0)
 
@@ -88,14 +89,14 @@ class CacheManager:
         """Batch retrieval of multiple keys. Missing or failed items map to None."""
         if not keys:
             return {}
-            
+
         async def _op(client: aioredis.Redis) -> List[Optional[str]]:
             return await client.mget(keys)
-            
+
         res = await self.redis.execute_with_retry(_op)
         if not res or not isinstance(res, list):
             return {k: None for k in keys}
-            
+
         return {k: (str(v) if v is not None else None) for k, v in zip(keys, res)}
 
     async def health(self) -> Dict[str, Any]:

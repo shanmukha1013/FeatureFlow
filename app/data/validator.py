@@ -1,7 +1,7 @@
 """
 Executes structural and quality validations on loaded datasets.
 
-Ensures that the raw DataFrames conform strictly to defined `DatasetSchema` 
+Ensures that the raw DataFrames conform strictly to defined `DatasetSchema`
 contracts before they are permitted downstream, catching anomalies early.
 """
 import pandas as pd
@@ -14,6 +14,7 @@ from app.data.exceptions import SchemaValidationError, DataValidationError
 
 logger = get_logger(__name__)
 
+
 @dataclass(frozen=True)
 class ValidationReport:
     """
@@ -24,11 +25,12 @@ class ValidationReport:
     is_valid: bool
     warnings: List[str] = field(default_factory=list)
 
+
 class DataValidator:
     """
     Validates Pandas DataFrames against schemas and semantic quality rules.
     """
-    
+
     def __init__(self, schema: DatasetSchema, max_null_percentage: float = 0.5) -> None:
         """
         Args:
@@ -37,33 +39,33 @@ class DataValidator:
         """
         if not (0.0 <= max_null_percentage <= 1.0):
             raise ValueError("max_null_percentage must be between 0.0 and 1.0.")
-            
+
         self.schema = schema
         self.max_null_percentage = max_null_percentage
 
     def validate(self, df: pd.DataFrame) -> ValidationReport:
         """
         Executes the full suite of validation rules on the dataset.
-        
+
         Args:
             df: The raw Pandas DataFrame to validate.
-            
+
         Returns:
             A ValidationReport detailing any warnings encountered.
-            
+
         Raises:
             DataValidationError: If the dataset is empty or completely unprocessable.
             SchemaValidationError: If the dataset strictly violates structural requirements.
         """
         logger.info(f"Initiating validation for dataset schema: {self.schema.name} (v{self.schema.version})")
-        
+
         self._check_empty(df)
         self._validate_schema(df)
-        
+
         warnings: List[str] = []
         warnings.extend(self._check_duplicates(df))
         warnings.extend(self._check_nulls(df))
-        
+
         logger.info(f"Dataset validation passed for '{self.schema.name}'. Generated {len(warnings)} warnings.")
         return ValidationReport(
             schema_name=self.schema.name,
@@ -86,11 +88,11 @@ class DataValidator:
             error_msg = f"Schema violation. Missing required columns: {missing_cols}"
             logger.error(error_msg)
             raise SchemaValidationError(error_msg)
-            
+
         for col_name, expected_dtype in self.schema.expected_dtypes.items():
             if col_name in df.columns:
                 actual_dtype: str = str(df[col_name].dtype)
-                # Allow flexible dtype matching to accommodate Pandas idiosyncrasies 
+                # Allow flexible dtype matching to accommodate Pandas idiosyncrasies
                 if expected_dtype not in actual_dtype and actual_dtype != 'object':
                     logger.warning(f"Type mismatch on '{col_name}': expected ~{expected_dtype}, got {actual_dtype}")
 

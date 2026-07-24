@@ -10,15 +10,17 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+
 class LocalArtifactStore:
     """
     Saves and retrieves trained model binaries locally using Joblib.
     Enforces artifact integrity via cryptographic checksums.
     """
+
     def __init__(self, base_dir: str = "models") -> None:
         self.base_dir = os.path.abspath(base_dir)
         os.makedirs(self.base_dir, exist_ok=True)
-        
+
     def _build_path(self, model_id: str, version: str) -> str:
         v_clean = str(version)[1:] if str(version).startswith('v') or str(version).startswith('V') else str(version)
         target_path = os.path.abspath(os.path.join(self.base_dir, f"{model_id}_v{v_clean}.joblib"))
@@ -43,10 +45,10 @@ class LocalArtifactStore:
             import joblib
             file_path = self._build_path(model_id, version)
             joblib.dump(model, file_path)
-            
+
             checksum = self._compute_checksum(file_path)
             logger.info(f"Artifact persisted successfully. Integrity checksum: {checksum[:8]}...")
-            
+
             return file_path, checksum
         except Exception as e:
             raise ArtifactError(f"Failed to serialize model artifact '{model_id}': {e}") from e
@@ -58,13 +60,13 @@ class LocalArtifactStore:
         file_path = self._build_path(model_id, version)
         if not os.path.exists(file_path):
             raise ArtifactError(f"Artifact not found at path: {file_path}")
-            
+
         if expected_checksum:
             actual_checksum = self._compute_checksum(file_path)
             if actual_checksum != expected_checksum:
                 logger.error(f"Integrity failure for artifact '{model_id}'. Expected {expected_checksum}, got {actual_checksum}.")
                 raise ArtifactError("Artifact checksum verification failed. The file may be corrupted or tampered with.")
-            
+
         try:
             import joblib
             return joblib.load(file_path)

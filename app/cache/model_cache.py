@@ -8,7 +8,7 @@ as the authoritative System of Record.
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, Tuple
 
 from app.cache.redis_client import RedisClient
 from app.cache.cache_manager import CacheManager
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class ModelRegistryCache:
     """
     Manages Redis caching for the Model Registry.
-    
+
     Cache Keys:
       - model:{model_id}
       - champion:{dataset}
@@ -33,7 +33,7 @@ class ModelRegistryCache:
         self.redis = redis_client or RedisClient.get_instance_sync()
         from app.cache.cache_manager import CacheManager
         self.cache = cache_manager or CacheManager(self.redis)
-        
+
         # Statistics tracking
         self.hits: int = 0
         self.misses: int = 0
@@ -121,7 +121,7 @@ class ModelRegistryCache:
         key = f"champion:{dataset}"
         effective_ttl = ttl if ttl is not None else getattr(settings, "redis_model_ttl", 3600)
         success = await self.cache.set_json(key, champion_data, ttl=effective_ttl)
-        
+
         # Also store by dataset_id if present so lookup by UUID or name both succeed
         dataset_id = champion_data.get("dataset_id")
         if dataset_id and dataset_id != dataset:
@@ -155,7 +155,7 @@ class ModelRegistryCache:
         keys_to_del = [f"model:{model_id}", f"metadata:{model_id}"]
         if dataset:
             keys_to_del.append(f"champion:{dataset}")
-        
+
         # Also check if this model_id is currently champion for any dataset
         try:
             async def _keys_op(client):
@@ -189,7 +189,6 @@ class ModelRegistryCache:
         # Fallback to PostgreSQL
         try:
             from app.storage.database import AsyncSessionLocal
-            from app.storage.repositories.core import ModelRepository
             from sqlalchemy.orm import selectinload
             from sqlalchemy import select
             from app.storage.models import Model
@@ -246,17 +245,17 @@ class ModelRegistryCache:
         # Fallback to PostgreSQL
         try:
             from app.storage.database import AsyncSessionLocal
-            from app.storage.repositories.core import ChampionModelRepository, DatasetRepository, ModelRepository
+            from app.storage.repositories.core import DatasetRepository
             from sqlalchemy.orm import selectinload
             from sqlalchemy import select
-            from app.storage.models import ChampionModel, Dataset, Model
+            from app.storage.models import ChampionModel
 
             async def _fetch(sess):
                 ds_repo = DatasetRepository(sess)
                 ds_obj = await ds_repo.get_by_name(dataset)
                 if not ds_obj:
                     ds_obj = await ds_repo.get(dataset)
-                
+
                 if not ds_obj:
                     return None, None
 
@@ -315,7 +314,7 @@ class ModelRegistryCache:
             from app.storage.database import AsyncSessionLocal
             from sqlalchemy import select
             from sqlalchemy.orm import selectinload
-            from app.storage.models import Model, ModelVersion, ModelArtifact, Feature, Experiment
+            from app.storage.models import Model, ModelVersion, Feature, Experiment
 
             async def _fetch(sess):
                 # 1. Fetch Model
@@ -584,7 +583,7 @@ class ModelRegistryCache:
 
             if redis_tasks:
                 for i in range(0, len(redis_tasks), 8):
-                    await asyncio.gather(*redis_tasks[i:i+8])
+                    await asyncio.gather(*redis_tasks[i:i + 8])
 
             self.refresh_count += 1
             self.last_refresh = datetime.now(timezone.utc).isoformat()

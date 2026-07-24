@@ -47,6 +47,7 @@ FEATURE_MAPPINGS: Dict[str, List[Dict[str, Any]]] = {
     ]
 }
 
+
 class FeatureEngineeringEngine:
     def __init__(self):
         pass
@@ -55,7 +56,7 @@ class FeatureEngineeringEngine:
         """Infers the semantic type for a given column based on naming heuristics and dtype."""
         dtype = dtype.lower()
         col_lower = col.lower()
-        
+
         if "datetime" in dtype or "date" in col_lower or "time" in col_lower:
             return "datetime"
         if "bool" in dtype or "is_" in col_lower or "has_" in col_lower:
@@ -64,7 +65,7 @@ class FeatureEngineeringEngine:
             if col_lower.endswith("_id") or col_lower == "id":
                 return "categorical"
             return "numeric"
-        
+
         if "description" in col_lower or "text" in col_lower or "comment" in col_lower:
             return "text"
         return "categorical"
@@ -75,21 +76,21 @@ class FeatureEngineeringEngine:
         """
         from app.storage.repositories.core import FeatureRepository
         feature_repo = FeatureRepository(session)
-        
+
         logger.info(f"Starting Feature Engineering for {dataset_record.name}")
         start_time = time.time()
-        
+
         features_generated = 0
-        
+
         dtypes_to_process = dataset_record.inferred_dtypes if dataset_record.inferred_dtypes else {}
-        
+
         for col, dtype in dtypes_to_process.items():
             semantic_type = self._determine_semantic_type(col, dtype)
             transformers = FEATURE_MAPPINGS.get(semantic_type, [])
-            
+
             for transformer_info in transformers:
                 feat_name = f"{dataset_record.name}_{col}_{transformer_info['name']}"
-                
+
                 # Check for existing feature in DB
                 from sqlalchemy.future import select
                 from app.storage.models import Feature
@@ -97,14 +98,14 @@ class FeatureEngineeringEngine:
                     select(Feature).filter(Feature.dataset_id == dataset_record.id, Feature.name == feat_name)
                 )
                 existing_feat = existing.scalars().first()
-                
+
                 version = 1
                 if existing_feat:
                     version = existing_feat.version + 1
                     existing_feat.version = version
                     existing_feat.dtype = transformer_info['dtype']
                     existing_feat.transformation = transformer_info['transformation']
-                    
+
                     await AuditLogger.record(session, AuditEvent(
                         event_name="FEATURE_UPDATED",
                         component="FeatureEngine",
@@ -119,19 +120,19 @@ class FeatureEngineeringEngine:
                         "transformation": transformer_info['transformation'],
                         "status": "ACTIVE"
                     })
-                    
+
                     await AuditLogger.record(session, AuditEvent(
                         event_name="FEATURE_GENERATED",
                         component="FeatureEngine",
                         severity="INFO",
                         payload={"feature_name": feat_name, "feature_id": new_feat.id}
                     ))
-                
+
                 features_generated += 1
-                
+
         # Commit all feature generations
         # Commit is deferred to the pipeline transaction
-                    
+
         exec_time = int((time.time() - start_time) * 1000)
         await AuditLogger.record(session, AuditEvent(
             event_name="FEATURE_EXECUTION_TIME",
@@ -139,7 +140,7 @@ class FeatureEngineeringEngine:
             severity="INFO",
             payload={"dataset": dataset_record.name, "features_engineered": features_generated, "time_ms": exec_time}
         ))
-        
+
         # Requirement 1: After Feature Engineering completes, automatically write every engineered feature into Redis
         try:
             from app.cache.online_store import get_online_store
@@ -170,6 +171,5 @@ class FeatureEngineeringEngine:
                 logger.info(f"Automatically wrote {len(entity_map)} entity feature vectors to Redis Online Store.")
         except Exception as e:
             logger.warning(f"Could not sync online features to Redis after Feature Engineering: {e}")
-        
-        logger.info(f"Feature Engineering complete for {dataset_record.name}. Generated {features_generated} features in {exec_time}ms.")
 
+        logger.info(f"Feature Engineering complete for {dataset_record.name}. Generated {features_generated} features in {exec_time}ms.")

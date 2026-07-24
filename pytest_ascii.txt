@@ -1,0 +1,51 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.3, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\marel\OneDrive\Desktop\FeatureFlow\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\marel\OneDrive\Desktop\FeatureFlow
+configfile: pytest.ini
+plugins: anyio-4.14.1, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 75 items
+
+tests/test_api.py::test_health_check PASSED                              [  1%]
+tests/test_api.py::test_version_check PASSED                             [  2%]
+tests/test_api.py::test_list_models PASSED                               [  4%]
+tests/test_api.py::test_management_overview PASSED                       [  5%]
+tests/test_api.py::test_management_registries_datasets_pagination PASSED [  6%]
+tests/test_api.py::test_management_registries_features PASSED            [  8%]
+tests/test_api.py::test_management_registries_models PASSED              [  9%]
+tests/test_api.py::test_management_pipelines_runs PASSED                 [ 10%]
+tests/test_api.py::test_management_observability_events PASSED           [ 12%]
+tests/test_api.py::test_predict_endpoint_validation_error PASSED         [ 13%]
+tests/test_auth.py::test_register_and_login FAILED                       [ 14%]
+tests/test_auth.py::test_me_endpoint FAILED                              [ 16%]
+tests/test_auth.py::test_api_keys FAILED                                 [ 17%]
+tests/test_auth_stress.py::test_auth_rate_limiting PASSED                [ 18%]
+tests/test_data_quality.py::test_data_quality_service_baseline_creation FAILED [ 20%]
+tests/test_data_quality.py::test_data_quality_critical_failure FAILED    [ 21%]
+tests/test_explainability.py::test_explainability_background_generation FAILED [ 22%]
+tests/test_explainability.py::test_explainability_cache_hit FAILED       [ 24%]
+tests/test_explainability.py::test_historical_explanations FAILED        [ 25%]
+tests/test_ml.py::test_logistic_regression_trainer_success PASSED        [ 26%]
+tests/test_ml.py::test_random_forest_trainer_success PASSED              [ 28%]
+tests/test_ml.py::test_classification_evaluator_success PASSED           [ 29%]
+tests/test_ml.py::test_local_artifact_store_save_and_load PASSED         [ 30%]
+tests/test_ml.py::test_prediction_engine_no_model_error PASSED           [ 32%]
+tests/test_ml.py::test_local_artifact_store_path_traversal PASSED        [ 33%]
+tests/test_ml.py::test_local_artifact_store_corrupted_checksum PASSED    [ 34%]
+tests/test_ml.py::test_local_artifact_store_missing_file PASSED          [ 36%]
+tests/test_ml.py::test_prediction_engine_batch_prediction PASSED         [ 37%]
+tests/test_model_cache.py::test_model_cache_hit_and_miss PASSED          [ 38%]
+tests/test_model_cache.py::test_postgresql_fallback_and_repopulation PASSED [ 40%]
+tests/test_model_cache.py::test_cache_refresh PASSED                     [ 41%]
+tests/test_model_cache.py::test_cache_invalidation_and_lifecycle_hooks PASSED [ 42%]
+tests/test_model_cache.py::test_model_cache_endpoints PASSED             [ 44%]
+tests/test_online_store.py::test_online_store_hit_and_miss PASSED        [ 45%]
+tests/test_online_store.py::test_postgresql_fallback_and_repopulation PASSED [ 46%]
+tests/test_online_store.py::test_ttl_expiration PASSED                   [ 48%]
+tests/test_online_store.py::test_batch_operations PASSED                 [ 49%]
+tests/test_online_store.py::test_version_invalidation FAILED             [ 50%]
+tests/test_online_store.py::test_online_features_endpoints FAILED        [ 52%]
+tests/test_prediction_cache.py::test_prediction_cache_hit_miss_and_security_sanitization PASSED [ 53%]
+tests/test_prediction_cache.py::test_single_flight_concurrency_safety PASSED [ 54%]
+tests/test_prediction_cache.py::test_batch_prediction_caching PASSED     [ 56%]

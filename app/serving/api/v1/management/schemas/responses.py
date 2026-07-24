@@ -4,6 +4,7 @@ Pydantic schemas for Management API responses.
 from pydantic import BaseModel
 from typing import List
 
+
 class PlatformOverviewSchema(BaseModel):
     platform_version: str
     health: str
@@ -16,6 +17,7 @@ class PlatformOverviewSchema(BaseModel):
     monitoring_status: str
     inference_status: str
 
+
 class SystemInfoSchema(BaseModel):
     python_version: str
     operating_system: str
@@ -24,7 +26,8 @@ class SystemInfoSchema(BaseModel):
     monitoring_backend: str
     inference_backend: str
     training_backend: str
-    
+
+
 class StatisticsSchema(BaseModel):
     total_predictions: int
     average_latency: float
@@ -32,6 +35,7 @@ class StatisticsSchema(BaseModel):
     pipeline_count: int
     inference_count: int
     validation_failures: int
+
 
 class AboutSchema(BaseModel):
     platform_name: str
@@ -41,7 +45,8 @@ class AboutSchema(BaseModel):
     license: str
     repository: str
     build_timestamp: str
-    
+
+
 class ConfigSchema(BaseModel):
     storage_backend: str
     monitoring_backend: str

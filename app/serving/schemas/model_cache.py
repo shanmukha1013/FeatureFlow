@@ -2,7 +2,7 @@
 Pydantic contracts for Phase 3 Redis Model Registry Cache endpoints.
 """
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Optional
 
 
 class ModelCacheStatsSchema(BaseModel):

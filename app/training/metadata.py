@@ -1,13 +1,14 @@
 """
 Defines immutable metadata contracts and reporting structures for trained models.
 
-Ensures absolute reproducibility by tracking the exact lineage of algorithms, 
+Ensures absolute reproducibility by tracking the exact lineage of algorithms,
 hyperparameters, features, and evaluation metrics tied to every trained artifact.
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from enum import Enum
+
 
 class ModelLifecycleState(str, Enum):
     """Represents the operational status of a trained model."""
@@ -17,6 +18,7 @@ class ModelLifecycleState(str, Enum):
     CHAMPION = "CHAMPION"
     ARCHIVED = "ARCHIVED"
     FAILED = "FAILED"
+
 
 @dataclass(frozen=True)
 class ModelMetadata:
@@ -71,6 +73,7 @@ class ModelMetadata:
             "training_timestamp": self.training_timestamp.isoformat()
         }
 
+
 @dataclass
 class TrainingReport:
     """
@@ -82,17 +85,17 @@ class TrainingReport:
     end_time: Optional[datetime] = None
     metadata: Optional[ModelMetadata] = None
     error_message: Optional[str] = None
-    
+
     def mark_success(self, metadata: ModelMetadata) -> None:
         self.status = "SUCCESS"
         self.metadata = metadata
         self.end_time = datetime.now(timezone.utc)
-        
+
     def mark_failure(self, error: str) -> None:
         self.status = "FAILED"
         self.error_message = error
         self.end_time = datetime.now(timezone.utc)
-        
+
     @property
     def total_duration_ms(self) -> float:
         if self.end_time:

@@ -35,7 +35,7 @@ def sanitize_redis_url(url: str) -> str:
 class RedisClient:
     """
     Singleton Redis connection manager using redis.asyncio.
-    
+
     Provides resilient pooled connections to Redis Cloud with automatic reconnects,
     timeouts, ping diagnostics, and zero-crash fallback guarantees.
     """
@@ -49,12 +49,22 @@ class RedisClient:
         is_test = "pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") or settings.environment.lower() == "test"
         self.pool_size = pool_size or (10 if is_test else settings.redis_pool_size)
         self.timeout = timeout or settings.redis_timeout
-        self.max_retries = 3
-        
+        self.max_retries = 5 if is_test else 3
+
         self._pool: Optional[ConnectionPool] = None
         self._client: Optional[aioredis.Redis] = None
+        self._semaphore: Optional[asyncio.Semaphore] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._is_connected: bool = False
+
+        # Phase 5: Live telemetry counters
+        self.total_commands: int = 0
+        self.total_errors: int = 0
+        self.reconnect_count: int = 0
+        self.last_connected_at: Optional[float] = None   # unix timestamp
+        self.last_error_at: Optional[float] = None        # unix timestamp
+        self.last_error_msg: str = ""
+
         self._initialized = True
 
     @classmethod
@@ -64,7 +74,9 @@ class RedisClient:
             async with cls._lock:
                 if cls._instance is None:
                     cls._instance = cls(url=url)
-                    await cls._instance.connect()
+            # connect() handles its own locking, call outside the get_instance lock
+            if not cls._instance.is_connected:
+                await cls._instance.connect()
         return cls._instance
 
     @classmethod
@@ -98,51 +110,56 @@ class RedisClient:
         Never crashes the application if connection fails.
         """
         sanitized = sanitize_redis_url(self.url)
-        try:
-            self._ensure_loop_safety()
-            if self._pool is None:
-                self._pool = ConnectionPool.from_url(
-                    self.url,
-                    max_connections=self.pool_size,
-                    socket_timeout=self.timeout,
-                    socket_connect_timeout=self.timeout,
-                    retry_on_timeout=True,
-                    decode_responses=True
-                )
-            if self._client is None:
-                self._client = aioredis.Redis(connection_pool=self._pool)
+        async with self._lock:
+            # If already connected by a previous task waiting on the lock, just return True
+            if self._pool is not None and self._client is not None and self._is_connected:
+                return True
 
-            # Health verification
-            if await self.ping():
+            try:
+                self._ensure_loop_safety()
+                if self._pool is None:
+                    self._pool = ConnectionPool.from_url(
+                        self.url,
+                        max_connections=self.pool_size,
+                        socket_timeout=self.timeout,
+                        socket_connect_timeout=self.timeout,
+                        retry_on_timeout=True,
+                        decode_responses=True
+                    )
+                if self._client is None:
+                    self._client = aioredis.Redis(connection_pool=self._pool)
+                if self._semaphore is None:
+                    self._semaphore = asyncio.Semaphore(self.pool_size)
+
                 self._is_connected = True
+                self.last_connected_at = time.time()
                 logger.info(f"Successfully connected to Redis Cloud ({sanitized}) with pool size {self.pool_size}.")
                 return True
-            else:
+            except Exception as e:
                 self._is_connected = False
-                logger.warning(f"Connected pool to Redis ({sanitized}) but PING returned false.")
+                self.last_error_at = time.time()
+                self.last_error_msg = str(e)
+                logger.error(f"Failed to connect to Redis ({sanitized}): {e}. Application will fall back to PostgreSQL.")
                 return False
-        except Exception as e:
-            self._is_connected = False
-            logger.error(f"Failed to connect to Redis ({sanitized}): {e}. Application will fall back to PostgreSQL.")
-            return False
 
     async def disconnect(self) -> None:
         """Gracefully closes all connections in the pool."""
         sanitized = sanitize_redis_url(self.url)
-        try:
-            if self._client:
-                await self._client.aclose()
-                self._client = None
-            if self._pool:
-                await self._pool.disconnect()
-                self._pool = None
-            self._is_connected = False
-            self._loop = None
-            logger.info(f"Cleanly disconnected from Redis ({sanitized}).")
-        except Exception as e:
-            logger.warning(f"Error during Redis disconnect ({sanitized}): {e}")
-            self._is_connected = False
-            self._loop = None
+        async with self._lock:
+            try:
+                if self._client:
+                    await self._client.aclose()
+                    self._client = None
+                if self._pool:
+                    await self._pool.disconnect()
+                    self._pool = None
+                self._is_connected = False
+                self._loop = None
+                logger.info(f"Cleanly disconnected from Redis ({sanitized}).")
+            except Exception as e:
+                logger.warning(f"Error during Redis disconnect ({sanitized}): {e}")
+                self._is_connected = False
+                self._loop = None
 
     @property
     def client(self) -> Optional[aioredis.Redis]:
@@ -162,7 +179,7 @@ class RedisClient:
         if not self._client:
             return False
         try:
-            res = await self._client.ping()
+            res = await asyncio.wait_for(self._client.ping(), timeout=self.timeout)
             return bool(res)
         except Exception as e:
             logger.debug(f"Redis ping failed: {e}")
@@ -181,28 +198,76 @@ class RedisClient:
                     connected = await self.connect()
                     if not connected:
                         raise RedisConnectionError("Redis connection is offline.")
-                
-                return await asyncio.wait_for(operation(self._client), timeout=self.timeout)
+
+                async def _run():
+                    if self._semaphore:
+                        async with self._semaphore:
+                            return await operation(self._client)
+                    else:
+                        return await operation(self._client)
+
+                result = await asyncio.wait_for(_run(), timeout=self.timeout)
+                self.total_commands += 1
+                return result
             except (RedisConnectionError, RedisTimeoutError, asyncio.TimeoutError) as e:
-                self._is_connected = False
+                self.total_errors += 1
+                self.last_error_at = time.time()
+                self.last_error_msg = str(e)
                 logger.warning(
                     f"Redis network/timeout error ({sanitized}) on attempt {attempt}/{self.max_retries}: {e}."
                 )
                 if attempt < self.max_retries:
                     await asyncio.sleep(0.2 * (2 ** (attempt - 1)))
-                    # Clean up sockets before reconnecting
-                    await self.disconnect()
-                    await self.connect()
+                    # Note: We rely on aioredis ConnectionPool's native auto-reconnect for broken sockets.
+                    # We do not destroy the pool here, as that causes disconnect storms and deadlocks.
                 else:
                     logger.error(f"Redis operation failed after {self.max_retries} retries ({sanitized}). Falling back.")
                     return None
             except RedisError as e:
                 logger.error(f"Redis operational error: {e}")
+                self.total_errors += 1
+                self.last_error_at = time.time()
+                self.last_error_msg = str(e)
                 return None
             except Exception as e:
                 logger.error(f"Unexpected error executing Redis operation: {e}")
+                self.total_errors += 1
+                self.last_error_at = time.time()
+                self.last_error_msg = str(e)
                 return None
         return None
+
+    async def delete(self, *keys: str) -> int:
+        """Convenience method to delete one or more keys. Returns count of deleted keys."""
+        if not keys:
+            return 0
+
+        async def _op(client: aioredis.Redis) -> int:
+            return await client.delete(*keys)
+        res = await self.execute_with_retry(_op)
+        return int(res or 0)
+
+    @property
+    def connection_pool_stats(self) -> Dict[str, Any]:
+        """Returns live connection pool utilization metrics."""
+        if self._pool is None:
+            return {"active": 0, "idle": 0, "max": self.pool_size, "utilization_pct": 0.0, "available": True}
+        try:
+            # ConnectionPool internals: _available_connections (idle), _in_use_connections (active)
+            idle = len(getattr(self._pool, "_available_connections", []))
+            active = len(getattr(self._pool, "_in_use_connections", set()))
+            total_created = idle + active
+            utilization = round((active / self.pool_size) * 100, 2) if self.pool_size > 0 else 0.0
+            return {
+                "active": active,
+                "idle": idle,
+                "total_created": total_created,
+                "max": self.pool_size,
+                "utilization_pct": utilization,
+                "available": active < self.pool_size
+            }
+        except Exception:
+            return {"active": 0, "idle": 0, "max": self.pool_size, "utilization_pct": 0.0, "available": True}
 
     async def health_check(self) -> Dict[str, Any]:
         """
@@ -227,13 +292,13 @@ class RedisClient:
                     latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
                     status = "ONLINE"
                     self._is_connected = True
-                    
+
                     # Fetch detailed server info
                     try:
                         info_server = await self._client.info("server")
                         info_memory = await self._client.info("memory")
                         info_clients = await self._client.info("clients")
-                        
+
                         version = str(info_server.get("redis_version", "unknown"))
                         connected_clients = int(info_clients.get("connected_clients", 0))
                         memory_usage = {

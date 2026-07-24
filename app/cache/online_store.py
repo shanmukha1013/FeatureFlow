@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 class OnlineFeatureStore:
     """
     Production-grade Online Feature Store backed by Redis Cloud.
-    
+
     Acts as a high-speed serving layer while preserving PostgreSQL as the single
     authoritative source of truth (`Offline Feature Store`).
     """
@@ -70,7 +70,7 @@ class OnlineFeatureStore:
         """
         key = self._make_key(dataset, entity_id)
         effective_ttl = ttl if ttl is not None else settings.redis_feature_ttl
-        
+
         payload = {
             "values": feature_values,
             "names": list(feature_values.keys()),
@@ -92,13 +92,13 @@ class OnlineFeatureStore:
         """
         key = self._make_key(dataset, entity_id)
         payload = await self.cache.get_json(key)
-        
+
         if track_stats:
             if payload is not None:
                 self.hits += 1
             else:
                 self.misses += 1
-                
+
         return payload
 
     async def get_online_features_batch(
@@ -111,10 +111,10 @@ class OnlineFeatureStore:
         """
         if not entity_ids:
             return {}
-            
+
         keys = [self._make_key(dataset, eid) for eid in entity_ids]
         raw_map = await self.cache.get_multi(keys)
-        
+
         result: Dict[str, Optional[Dict[str, Any]]] = {}
         import json
         for eid, key in zip(entity_ids, keys):
@@ -131,7 +131,7 @@ class OnlineFeatureStore:
             else:
                 self.misses += 1
                 result[eid] = None
-                
+
         return result
 
     async def store_online_features_batch(
@@ -159,7 +159,7 @@ class OnlineFeatureStore:
         ]
         if not tasks:
             return {}
-            
+
         results = await asyncio.gather(*tasks)
         return {eid: res for eid, res in zip(entity_features_map.keys(), results)}
 
@@ -181,8 +181,7 @@ class OnlineFeatureStore:
         try:
             from app.storage.database import AsyncSessionLocal
             from app.storage.repositories.core import FeatureValueRepository, DatasetRepository
-            from app.storage.models import Feature
-            
+
             async with AsyncSessionLocal() as session:
                 # Resolve dataset ID if dataset parameter is a name
                 ds_repo = DatasetRepository(session)
@@ -190,17 +189,17 @@ class OnlineFeatureStore:
                 if not ds_obj:
                     # Maybe dataset parameter passed is already the UUID
                     ds_obj = await ds_repo.get_by_id(dataset)
-                
+
                 ds_id = ds_obj.id if ds_obj else dataset
                 ds_version = ds_obj.version if ds_obj else 1
-                
+
                 fv_repo = FeatureValueRepository(session)
                 fvs = await fv_repo.get_by_entity(entity_id=entity_id, dataset_id=ds_id)
-                
+
                 if not fvs:
                     logger.debug(f"No offline features in PostgreSQL for entity '{entity_id}' in dataset '{dataset}'.")
                     return None
-                    
+
                 # Reconstruct feature values dictionary from authoritative PostgreSQL records
                 feature_values: Dict[str, Any] = {}
                 max_version = 1
@@ -214,10 +213,10 @@ class OnlineFeatureStore:
                             feature_values[fv.feature.name] = val
                     if fv.version and fv.version > max_version:
                         max_version = fv.version
-                        
+
                 if not feature_values:
                     return None
-                    
+
                 # Store reconstructed vector into Redis (repopulation)
                 await self.store_online_features(
                     dataset=dataset,
@@ -227,7 +226,7 @@ class OnlineFeatureStore:
                     dataset_version=ds_version,
                     ttl=ttl
                 )
-                
+
                 return {
                     "values": feature_values,
                     "names": list(feature_values.keys()),
@@ -248,20 +247,20 @@ class OnlineFeatureStore:
         Executes prediction/lookup flow:
         1. Query Redis (if hit, return immediately).
         2. If miss, load from PostgreSQL, reconstruct, store in Redis, and return.
-        
+
         Returns tuple of (feature_payload, source) where source is 'redis' or 'postgresql'.
         """
         # 1. Query Redis first
         payload = await self.get_online_features(dataset, entity_id, track_stats=True)
         if payload is not None:
             return payload, "redis"
-            
+
         # 2. On Miss, fall back to PostgreSQL offline store & repopulate Redis
         logger.info(f"Online store cache miss for {dataset}:{entity_id}. Loading from PostgreSQL offline store.")
         payload = await self.refresh_online_features(dataset, entity_id)
         if payload is not None:
             return payload, "postgresql"
-            
+
         return None, "miss"
 
     async def invalidate_dataset_features(
@@ -278,10 +277,10 @@ class OnlineFeatureStore:
             keys_to_delete = []
             async for key in client.scan_iter(match=match_pattern):
                 keys_to_delete.append(key)
-                
+
             if not keys_to_delete:
                 return 0
-                
+
             if version is not None:
                 # If a specific old version is targeted, check payload versions before deleting
                 raw_map = await client.mget(keys_to_delete)
@@ -296,12 +295,18 @@ class OnlineFeatureStore:
                         except Exception:
                             filtered_keys.append(key)
                 keys_to_delete = filtered_keys
-                
+
             if keys_to_delete:
                 return await client.delete(*keys_to_delete)
             return 0
 
         res = await self.cache.redis.execute_with_retry(_scan_and_delete)
+        try:
+            from app.cache.prediction_cache import get_prediction_cache
+            pcache = await get_prediction_cache()
+            await pcache.invalidate_cache(dataset=dataset)
+        except Exception as e:
+            logger.debug(f"Could not invalidate prediction cache from online store: {e}")
         return int(res or 0)
 
     def get_stats(self) -> Dict[str, Any]:

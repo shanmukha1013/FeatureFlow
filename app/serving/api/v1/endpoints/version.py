@@ -7,6 +7,7 @@ from app.serving.config import serving_config
 
 router = APIRouter()
 
+
 @router.get("/version", response_model=VersionResponseSchema)
 def get_version():
     """

@@ -41,15 +41,15 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_DB=featureflow
+      - POSTGRES_USER=featureflow
+      - POSTGRES_PASSWORD=featureflow_password
+      - POSTGRES_DB=featureflow_test
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d featureflow"]
+      test: ["CMD-SHELL", "pg_isready -U featureflow -d featureflow_test"]
       interval: 10s
       timeout: 5s
       retries: 5

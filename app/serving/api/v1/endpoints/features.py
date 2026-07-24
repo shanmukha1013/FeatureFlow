@@ -2,7 +2,6 @@
 Implements the Online Feature Store endpoints for serving real-time feature vectors.
 """
 from fastapi import APIRouter, HTTPException, Query, status
-from typing import Optional, Dict, Any
 
 from app.serving.schemas.features import (
     StoreFeatureRequestSchema,

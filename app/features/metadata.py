@@ -1,17 +1,18 @@
 """
 Immutable configuration schema for feature representations.
 
-Strictly defines the metadata contract required for every feature, enabling 
+Strictly defines the metadata contract required for every feature, enabling
 registry indexing, searchability, and safe transformation dependencies.
 """
 from dataclasses import dataclass, field
 from typing import List, Optional, Any
 
+
 @dataclass(frozen=True)
 class FeatureMetadata:
     """
     Immutable metadata encapsulating feature context and operational properties.
-    
+
     Attributes:
         name: A unique string identifier for the feature.
         description: Semantic context explaining the feature's logic.

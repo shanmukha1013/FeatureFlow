@@ -10,10 +10,12 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+
 class LogisticRegressionTrainer(BaseTrainer):
     """
     Linear classification model targeting tabular numeric features.
     """
+
     def __init__(self, **hyperparameters: Any) -> None:
         self.hyperparameters = hyperparameters
         try:
@@ -21,11 +23,11 @@ class LogisticRegressionTrainer(BaseTrainer):
             self._model = LogisticRegression(**hyperparameters)
         except ImportError:
             raise TrainingFailure("scikit-learn is required but not installed.")
-            
+
     @property
     def algorithm_name(self) -> str:
         return "LogisticRegression"
-        
+
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
         logger.info(f"Commencing training sequence for {self.algorithm_name}.")
         try:
@@ -42,6 +44,7 @@ class RandomForestTrainer(BaseTrainer):
     """
     Ensemble classification model handling complex non-linear relationships.
     """
+
     def __init__(self, **hyperparameters: Any) -> None:
         self.hyperparameters = hyperparameters
         try:
@@ -49,11 +52,11 @@ class RandomForestTrainer(BaseTrainer):
             self._model = RandomForestClassifier(**hyperparameters)
         except ImportError:
             raise TrainingFailure("scikit-learn is required but not installed.")
-            
+
     @property
     def algorithm_name(self) -> str:
         return "RandomForest"
-        
+
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
         logger.info(f"Commencing training sequence for {self.algorithm_name}.")
         try:
@@ -70,6 +73,7 @@ class DecisionTreeTrainer(BaseTrainer):
     """
     Non-linear classification model based on tree logic.
     """
+
     def __init__(self, **hyperparameters: Any) -> None:
         self.hyperparameters = hyperparameters
         try:
@@ -77,11 +81,11 @@ class DecisionTreeTrainer(BaseTrainer):
             self._model = DecisionTreeClassifier(**hyperparameters)
         except ImportError:
             raise TrainingFailure("scikit-learn is required but not installed.")
-            
+
     @property
     def algorithm_name(self) -> str:
         return "DecisionTree"
-        
+
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
         logger.info(f"Commencing training sequence for {self.algorithm_name}.")
         try:

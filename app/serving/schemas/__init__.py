@@ -3,8 +3,8 @@ Exposes Pydantic schemas for the Serving Layer.
 """
 from .request import PredictRequestSchema
 from .response import (
-    PredictResponseSchema, 
-    HealthResponseSchema, 
+    PredictResponseSchema,
+    HealthResponseSchema,
     ModelsResponseSchema,
     VersionResponseSchema
 )

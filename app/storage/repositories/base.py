@@ -6,6 +6,7 @@ from app.storage.database import Base
 
 ModelType = TypeVar("ModelType", bound=Base)
 
+
 class BaseRepository(Generic[ModelType]):
     def __init__(self, model: Type[ModelType], session: AsyncSession):
         self.model = model
@@ -16,7 +17,7 @@ class BaseRepository(Generic[ModelType]):
             select(self.model).filter(self.model.id == id, self.model.status != 'ARCHIVED')
         )
         return result.scalars().first()
-        
+
     async def get_including_archived(self, id: str) -> Optional[ModelType]:
         result = await self.session.execute(
             select(self.model).filter(self.model.id == id)
@@ -34,7 +35,7 @@ class BaseRepository(Generic[ModelType]):
 
     async def get_active(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
         return await self.get_multi(skip, limit)
-        
+
     async def get_archived(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
         result = await self.session.execute(
             select(self.model).filter(self.model.status == 'ARCHIVED').offset(skip).limit(limit)
@@ -81,7 +82,7 @@ class BaseRepository(Generic[ModelType]):
             update(self.model).where(self.model.id == target_id).values(status='ARCHIVED')
         )
         await self.session.flush()
-        
+
     async def restore(self, id: Any) -> None:
         """Restore an archived record back to ACTIVE status."""
         target_id = id.id if hasattr(id, 'id') else id
@@ -89,10 +90,9 @@ class BaseRepository(Generic[ModelType]):
             update(self.model).where(self.model.id == target_id).values(status='ACTIVE')
         )
         await self.session.flush()
-        
+
     async def hard_delete(self, id: Any) -> None:
         """Permanently remove a record from the database. Use with extreme caution."""
         target_id = id.id if hasattr(id, 'id') else id
         await self.session.execute(delete(self.model).where(self.model.id == target_id))
         await self.session.flush()
-

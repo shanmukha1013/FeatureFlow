@@ -1,11 +1,12 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.storage.repositories.base import BaseRepository
 from app.storage.models import (
-    Dataset, DatasetVersion, Feature, FeatureValue, Model, 
+    Dataset, DatasetVersion, Feature, FeatureValue, Model,
     ChampionModel, Experiment, PipelineRun, AuditLog
 )
+
 
 class DatasetRepository(BaseRepository[Dataset]):
     def __init__(self, session: AsyncSession):
@@ -25,6 +26,7 @@ class DatasetRepository(BaseRepository[Dataset]):
         result = await self.session.execute(query)
         return result.scalars().first()
 
+
 class DatasetVersionRepository(BaseRepository[DatasetVersion]):
     def __init__(self, session: AsyncSession):
         super().__init__(DatasetVersion, session)
@@ -42,6 +44,7 @@ class DatasetVersionRepository(BaseRepository[DatasetVersion]):
         )
         return result.scalars().first()
 
+
 class FeatureRepository(BaseRepository[Feature]):
     def __init__(self, session: AsyncSession):
         super().__init__(Feature, session)
@@ -54,6 +57,7 @@ class FeatureRepository(BaseRepository[Feature]):
             .filter(Feature.dataset_id == dataset_id, Feature.status != 'ARCHIVED')
         )
         return result.scalars().all()
+
 
 class FeatureValueRepository(BaseRepository[FeatureValue]):
     def __init__(self, session: AsyncSession):
@@ -80,6 +84,7 @@ class FeatureValueRepository(BaseRepository[FeatureValue]):
         )
         return result.scalars().all()
 
+
 class ModelRepository(BaseRepository[Model]):
     def __init__(self, session: AsyncSession):
         super().__init__(Model, session)
@@ -90,7 +95,7 @@ class ModelRepository(BaseRepository[Model]):
             select(Model)
             .options(selectinload(Model.dataset))
             .filter(
-                Model.dataset_id == dataset_id, 
+                Model.dataset_id == dataset_id,
                 Model.name == name,
                 Model.status != 'ARCHIVED'
             )
@@ -110,8 +115,11 @@ class ModelRepository(BaseRepository[Model]):
         db_obj = await super().create(obj_in)
         try:
             from app.cache.model_cache import get_model_registry_cache
+            from app.cache.prediction_cache import get_prediction_cache
             cache = await get_model_registry_cache()
             await cache.refresh_model_cache(db_obj.id)
+            pcache = await get_prediction_cache()
+            await pcache.invalidate_cache(model_id=db_obj.id, dataset=db_obj.dataset_id)
         except Exception:
             pass
         return db_obj
@@ -120,11 +128,14 @@ class ModelRepository(BaseRepository[Model]):
         res = await super().update(db_obj, obj_in)
         try:
             from app.cache.model_cache import get_model_registry_cache
+            from app.cache.prediction_cache import get_prediction_cache
             cache = await get_model_registry_cache()
+            pcache = await get_prediction_cache()
             if res.status == 'ARCHIVED':
                 await cache.delete_model_cache(res.id, dataset=res.dataset_id)
             else:
                 await cache.refresh_model_cache(res.id)
+            await pcache.invalidate_cache(model_id=res.id, dataset=res.dataset_id)
         except Exception:
             pass
         return res
@@ -135,8 +146,11 @@ class ModelRepository(BaseRepository[Model]):
         await super().delete(id)
         try:
             from app.cache.model_cache import get_model_registry_cache
+            from app.cache.prediction_cache import get_prediction_cache
             cache = await get_model_registry_cache()
             await cache.delete_model_cache(target_id, dataset=ds_id)
+            pcache = await get_prediction_cache()
+            await pcache.invalidate_cache(model_id=target_id, dataset=ds_id)
         except Exception:
             pass
 
@@ -145,8 +159,11 @@ class ModelRepository(BaseRepository[Model]):
         ds_id = id.dataset_id if hasattr(id, 'dataset_id') else None
         try:
             from app.cache.model_cache import get_model_registry_cache
+            from app.cache.prediction_cache import get_prediction_cache
             cache = await get_model_registry_cache()
             await cache.delete_model_cache(target_id, dataset=ds_id)
+            pcache = await get_prediction_cache()
+            await pcache.invalidate_cache(model_id=target_id, dataset=ds_id)
         except Exception:
             pass
         await super().hard_delete(id)
@@ -172,9 +189,14 @@ class ChampionModelRepository(BaseRepository[ChampionModel]):
         db_obj = await super().create(obj_in)
         try:
             from app.cache.model_cache import get_model_registry_cache
+            from app.cache.prediction_cache import get_prediction_cache
             cache = await get_model_registry_cache()
             if db_obj.dataset_id:
                 await cache.refresh_champion_cache(db_obj.dataset_id)
+            pcache = await get_prediction_cache()
+            await pcache.invalidate_cache(dataset=db_obj.dataset_id)
+            if hasattr(db_obj, 'model_id') and db_obj.model_id:
+                await pcache.invalidate_cache(model_id=db_obj.model_id)
         except Exception:
             pass
         return db_obj
@@ -183,9 +205,14 @@ class ChampionModelRepository(BaseRepository[ChampionModel]):
         res = await super().update(db_obj, obj_in)
         try:
             from app.cache.model_cache import get_model_registry_cache
+            from app.cache.prediction_cache import get_prediction_cache
             cache = await get_model_registry_cache()
             if res.dataset_id:
                 await cache.refresh_champion_cache(res.dataset_id)
+            pcache = await get_prediction_cache()
+            await pcache.invalidate_cache(dataset=res.dataset_id)
+            if hasattr(res, 'model_id') and res.model_id:
+                await pcache.invalidate_cache(model_id=res.model_id)
         except Exception:
             pass
         return res
@@ -193,12 +220,17 @@ class ChampionModelRepository(BaseRepository[ChampionModel]):
     async def delete(self, id: Any) -> None:
         target_obj = id if hasattr(id, 'dataset_id') else await self.get(id)
         ds_id = target_obj.dataset_id if target_obj else None
+        model_id = target_obj.model_id if target_obj and hasattr(target_obj, 'model_id') else None
         await super().delete(id)
-        if ds_id:
+        if ds_id or model_id:
             try:
                 from app.cache.model_cache import get_model_registry_cache
+                from app.cache.prediction_cache import get_prediction_cache
                 cache = await get_model_registry_cache()
-                await cache.delete_model_cache("", dataset=ds_id)
+                if ds_id:
+                    await cache.delete_model_cache("", dataset=ds_id)
+                pcache = await get_prediction_cache()
+                await pcache.invalidate_cache(model_id=model_id, dataset=ds_id)
             except Exception:
                 pass
 
@@ -225,9 +257,11 @@ class ExperimentRepository(BaseRepository[Experiment]):
         )
         return result.scalars().all()
 
+
 class PipelineRunRepository(BaseRepository[PipelineRun]):
     def __init__(self, session: AsyncSession):
         super().__init__(PipelineRun, session)
+
 
 class AuditLogRepository(BaseRepository[AuditLog]):
     def __init__(self, session: AsyncSession):
