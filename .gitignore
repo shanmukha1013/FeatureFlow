@@ -3,6 +3,8 @@ __pycache__/
 *$py.class
 venv/
 .env
+.env.development
+.env.production
 datasets/
 models/
 experiments/
@@ -15,3 +17,8 @@ test.db
 test.db-journal
 scratch/
 tests/models/
+reports/
+alembic/__pycache__/
+certify_final.log
+production_certification_report.md
+evidently_modules.txt

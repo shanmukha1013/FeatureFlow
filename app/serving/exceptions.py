@@ -32,7 +32,11 @@ async def service_unavailable_handler(request: Request, exc: ModelLoadError):
 
 async def internal_error_handler(request: Request, exc: Exception):
     """Handles 500 Internal Server Error - Unexpected crashes."""
+    from app.config import settings
+
+    message = "An unexpected internal server error occurred." if settings.is_production else str(exc)
+
     return JSONResponse(
         status_code=500,
-        content={"error": {"error_code": "INTERNAL_ERROR", "message": str(exc)}}
+        content={"error": {"error_code": "INTERNAL_ERROR", "message": message}}
     )

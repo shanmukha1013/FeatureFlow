@@ -32,7 +32,13 @@ class CacheManager:
             return await client.get(key)
 
         res = await self.redis.execute_with_retry(_op)
-        return str(res) if res is not None else None
+        from app.observability.instrumentation import record_cache_hit, record_cache_miss
+        if res is not None:
+            record_cache_hit("general")
+            return str(res)
+        else:
+            record_cache_miss("general")
+            return None
 
     async def set(self, key: str, value: Union[str, int, float], ttl: Optional[int] = 3600) -> bool:
         """Stores a string/primitive value in cache with optional TTL in seconds."""
@@ -67,13 +73,20 @@ class CacheManager:
 
     async def get_json(self, key: str) -> Optional[Dict[str, Any]]:
         """Retrieves and deserializes a JSON object from cache."""
-        raw = await self.get(key)
-        if not raw:
-            return None
-        try:
-            return json.loads(raw)
-        except Exception as e:
-            logger.warning(f"Failed to decode JSON from cache key '{key}': {e}")
+        async def _op(client: aioredis.Redis) -> Optional[str]:
+            return await client.get(key)
+
+        res = await self.redis.execute_with_retry(_op)
+        from app.observability.instrumentation import record_cache_hit, record_cache_miss
+        if res is not None:
+            record_cache_hit("json")
+            try:
+                return json.loads(res)
+            except Exception as e:
+                logger.warning(f"Failed to decode JSON from cache key '{key}': {e}")
+                return None
+        else:
+            record_cache_miss("json")
             return None
 
     async def set_json(self, key: str, value: Dict[str, Any], ttl: Optional[int] = 3600) -> bool:

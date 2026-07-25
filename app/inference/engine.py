@@ -387,7 +387,16 @@ class PredictionEngine:
         object.__setattr__(req, "background_tasks", background_tasks)
         object.__setattr__(req, "user_id", user_id)
 
-        return await self._execute_predict(req, alias)
+        from app.observability.instrumentation import record_prediction, record_prediction_failure
+        import time
+        start_time = time.time()
+        try:
+            res = await self._execute_predict(req, alias)
+            record_prediction(alias, time.time() - start_time)
+            return res
+        except Exception as e:
+            record_prediction_failure(alias, type(e).__name__)
+            raise
 
     async def predict_batch(self, batch_features: List[Dict[str, Any]], alias: str = "default") -> List[PredictionResponse]:
         if not batch_features:

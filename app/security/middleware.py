@@ -17,9 +17,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 def setup_security_middleware(app: FastAPI):
     # CORS
+    from app.config import settings
+    origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # In production, restrict this
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

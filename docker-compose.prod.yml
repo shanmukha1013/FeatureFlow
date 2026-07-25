@@ -4,20 +4,25 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     env_file:
-      - .env.development
+      - .env.production
     depends_on:
       redis:
         condition: service_started
       postgres:
         condition: service_healthy
     volumes:
-      - .:/app
       - featureflow_models:/app/models
       - featureflow_datasets:/app/datasets
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
 
   frontend:
     build:
@@ -27,6 +32,7 @@ services:
       - "80:80"
     depends_on:
       - api
+    restart: unless-stopped
 
   redis:
     image: redis:alpine
@@ -34,22 +40,30 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   postgres:
     image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=featureflow
-      - POSTGRES_PASSWORD=featureflow_password
-      - POSTGRES_DB=featureflow_test
+    env_file:
+      - .env.production
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U featureflow -d featureflow_test"]
+      test: ["CMD-SHELL", "pg_isready -U featureflow -d featureflow_production"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   prometheus:
     image: prom/prometheus:v2.45.0
@@ -64,6 +78,7 @@ services:
       - '--storage.tsdb.path=/prometheus'
     depends_on:
       - api
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:10.0.3
@@ -72,12 +87,11 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
-    environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    env_file:
+      - .env.production
     depends_on:
       - prometheus
+    restart: unless-stopped
 
 volumes:
   featureflow_models:

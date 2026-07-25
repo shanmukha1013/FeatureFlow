@@ -1,0 +1,128 @@
+groups:
+  - name: featureflow_alerts
+    rules:
+      - alert: HighApiLatency
+        expr: histogram_quantile(0.95, rate(featureflow_http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API Latency on {{ $labels.instance }}"
+          description: "P95 latency is over 1 second for 2 minutes."
+
+      - alert: HighErrorRate
+        expr: rate(featureflow_http_requests_total{status=~"5.."}[5m]) / rate(featureflow_http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Error Rate on {{ $labels.instance }}"
+          description: "HTTP 5xx error rate is above 5%."
+
+      - alert: HighPredictionLatency
+        expr: histogram_quantile(0.95, rate(featureflow_prediction_latency_seconds_bucket[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Prediction Latency"
+          description: "P95 prediction latency is over 0.5s for 2 minutes."
+
+      - alert: HighPredictionFailureRate
+        expr: rate(featureflow_prediction_failures_total[5m]) / rate(featureflow_prediction_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Prediction Failure Rate"
+          description: "Prediction failure rate is above 5%."
+
+      - alert: RedisUnavailable
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance is unreachable."
+
+      - alert: PostgreSQLUnavailable
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance is unreachable."
+
+      - alert: MLflowUnavailable
+        expr: up{job="mlflow"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MLflow is down"
+          description: "MLflow backend is unreachable."
+
+      - alert: CacheHitRateLow
+        expr: rate(featureflow_cache_hits_total[5m]) / (rate(featureflow_cache_hits_total[5m]) + rate(featureflow_cache_misses_total[5m]) + 0.001) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low Cache Hit Rate"
+          description: "Cache hit rate is below 50% for 5 minutes."
+
+      - alert: TrainingTakingTooLong
+        expr: featureflow_training_duration_seconds > 3600
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Long Training Duration"
+          description: "A training job has taken over 1 hour."
+
+      - alert: FeatureRetrievalTimeout
+        expr: rate(featureflow_http_requests_total{endpoint="/api/v1/features/online", status="504"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Feature Retrieval Timeout"
+          description: "Timeouts observed during online feature retrieval."
+
+      - alert: DriftDetected
+        expr: rate(featureflow_drift_detected_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Data Drift Detected"
+          description: "Evidently has detected data drift in recent checks."
+
+      - alert: NoDriftChecksExecuted
+        expr: rate(featureflow_drift_checks_total[24h]) == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No Drift Checks Executed"
+          description: "No data drift checks have been executed in the last 24 hours."
+
+      - alert: HighMemoryUsage
+        expr: featureflow_process_memory_bytes > 1073741824
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Memory Usage"
+          description: "API process is using more than 1GB of memory."
+
+      - alert: HighCpuUsage
+        expr: featureflow_process_cpu_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU Usage"
+          description: "API process is using more than 80% CPU."

@@ -36,16 +36,35 @@ def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
     active_level: int = getattr(logging, active_level_str.upper(), logging.INFO)
     logger.setLevel(active_level)
 
-    # Attach standard console handler
+    # Attach standard console handler or JSON handler based on environment
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(active_level)
 
-    formatter = logging.Formatter(fmt=_LOG_FORMAT, datefmt=_DATE_FORMAT)
+    # Use JSON formatter in production
+    is_prod = os.getenv("ENVIRONMENT", "").lower() == "production"
+    if is_prod:
+        import json
+
+        class JsonFormatter(logging.Formatter):
+            def format(self, record):
+                log_record = {
+                    "time": self.formatTime(record, _DATE_FORMAT),
+                    "name": record.name,
+                    "level": record.levelname,
+                    "function": record.funcName,
+                    "message": record.getMessage()
+                }
+                if record.exc_info:
+                    log_record["exception"] = self.formatException(record.exc_info)
+                return json.dumps(log_record)
+
+        formatter = JsonFormatter()
+    else:
+        formatter = logging.Formatter(fmt=_LOG_FORMAT, datefmt=_DATE_FORMAT)
+
     console_handler.setFormatter(formatter)
-
     logger.addHandler(console_handler)
 
-    # Prevent propagation to the root logger to avoid duplicate log entries
+    # Disable propagation to avoid duplicate logs if root logger is also configured
     logger.propagate = False
 
     return logger

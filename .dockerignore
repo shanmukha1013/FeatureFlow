@@ -1,0 +1,16 @@
+venv/
+.env*
+!.env.example
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.github/
+scratch/
+test.db
+models/*
+!models/.keep
+datasets/*
+!datasets/.keep
+reports/*
+!reports/.keep

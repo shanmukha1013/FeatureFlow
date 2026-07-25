@@ -29,12 +29,17 @@ class LogisticRegressionTrainer(BaseTrainer):
         return "LogisticRegression"
 
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
+        from app.observability.instrumentation import record_training_success, record_training_failure
+        import time
+        start_time = time.time()
         logger.info(f"Commencing training sequence for {self.algorithm_name}.")
         try:
             self._model.fit(X_train, y_train)
             logger.info("Training sequence completed successfully.")
+            record_training_success(self.algorithm_name, time.time() - start_time)
             return self._model
         except Exception as e:
+            record_training_failure(self.algorithm_name)
             error_msg = f"Fatal failure during {self.algorithm_name} training: {e}"
             logger.error(error_msg)
             raise TrainingFailure(error_msg) from e
@@ -58,12 +63,17 @@ class RandomForestTrainer(BaseTrainer):
         return "RandomForest"
 
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
+        from app.observability.instrumentation import record_training_success, record_training_failure
+        import time
+        start_time = time.time()
         logger.info(f"Commencing training sequence for {self.algorithm_name}.")
         try:
             self._model.fit(X_train, y_train)
             logger.info("Training sequence completed successfully.")
+            record_training_success(self.algorithm_name, time.time() - start_time)
             return self._model
         except Exception as e:
+            record_training_failure(self.algorithm_name)
             error_msg = f"Fatal failure during {self.algorithm_name} training: {e}"
             logger.error(error_msg)
             raise TrainingFailure(error_msg) from e
@@ -87,12 +97,17 @@ class DecisionTreeTrainer(BaseTrainer):
         return "DecisionTree"
 
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
+        from app.observability.instrumentation import record_training_success, record_training_failure
+        import time
+        start_time = time.time()
         logger.info(f"Commencing training sequence for {self.algorithm_name}.")
         try:
             self._model.fit(X_train, y_train)
             logger.info("Training sequence completed successfully.")
+            record_training_success(self.algorithm_name, time.time() - start_time)
             return self._model
         except Exception as e:
+            record_training_failure(self.algorithm_name)
             error_msg = f"Fatal failure during {self.algorithm_name} training: {e}"
             logger.error(error_msg)
             raise TrainingFailure(error_msg) from e

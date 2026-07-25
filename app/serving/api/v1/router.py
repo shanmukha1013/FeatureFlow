@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.serving.api.v1.endpoints import predict, health, models, version, features, model_cache, prediction_cache, explanations, data_quality
+from app.serving.api.v1.endpoints import predict, health, models, version, features, model_cache, prediction_cache, explanations, data_quality, monitoring, mlflow
 from app.serving.api.v1.endpoints import redis_observability, auth, users, api_keys, admin_security
 from app.serving.api.v1.management.router import management_router
 from app.security.dependencies import get_current_user
@@ -26,6 +26,8 @@ v1_router.include_router(prediction_cache.router, tags=["prediction_cache"], dep
 v1_router.include_router(redis_observability.router, tags=["redis_observability"], dependencies=protected)
 v1_router.include_router(explanations.router, dependencies=protected)
 v1_router.include_router(data_quality.router, prefix="/data-quality", tags=["data-quality"], dependencies=protected)
+v1_router.include_router(monitoring.router, dependencies=protected)
+v1_router.include_router(mlflow.router, dependencies=protected)
 
 # Management router might have its own protection or we protect it fully here
 v1_router.include_router(management_router, dependencies=protected)

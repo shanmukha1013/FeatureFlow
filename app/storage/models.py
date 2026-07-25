@@ -208,11 +208,25 @@ class Experiment(Base):
     id = Column(String, primary_key=True, default=gen_uuid)
     name = Column(String, unique=False, index=True, nullable=False)
     dataset_id = Column(String, ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # MLflow Metadata
+    mlflow_run_id = Column(String, nullable=True, index=True)
+    mlflow_experiment_id = Column(String, nullable=True, index=True)
+    model_name = Column(String, nullable=True, index=True)
+    model_version = Column(String, nullable=True)
+    status = Column(String, default="RUNNING", index=True)
+
     algorithm = Column(String, nullable=True)
     hyperparameters = Column(JSONB, nullable=True)
     metrics = Column(JSONB, nullable=True)
+    parameters = Column(JSONB, nullable=True)
+    artifact_uri = Column(String, nullable=True)
+    duration = Column(Float, nullable=True)
+
+    started_at = Column(DateTime(timezone=True), default=utcnow)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+
     model_id = Column(String, ForeignKey("models.id", ondelete="SET NULL"), nullable=True, index=True)
-    status = Column(String, default="RUNNING", index=True)
     version = Column(Integer, default=1)
     end_time = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
@@ -499,4 +513,17 @@ class GlobalExplanationSummary(Base):
     top_n_features = Column(JSONB, nullable=True)
 
     model_version = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class MonitoringReport(Base):
+    __tablename__ = "monitoring_reports"
+    id = Column(String, primary_key=True, default=gen_uuid)
+    reference_dataset_id = Column(String, ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True, index=True)
+    current_dataset_id = Column(String, ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True, index=True)
+    drift_detected = Column(Boolean, nullable=False, default=False)
+    metrics = Column(JSONB, nullable=True)  # Store summary stats
+    html_path = Column(String, nullable=True)
+    status = Column(String, default="COMPLETED", index=True)
+    version = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
