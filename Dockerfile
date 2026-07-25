@@ -8,7 +8,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Install OS build dependencies (needed for C-extension wheels)
+# Install OS build dependencies (needed for C-extension wheels: cffi, cryptography, asyncpg)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -20,7 +20,10 @@ RUN apt-get update && \
 
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
-    pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
+    pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt && \
+    # great-expectations declares numpy<2.0 in metadata but works with numpy 2.x at runtime.
+    # scipy and shap require numpy>=2.0. Install GE with --no-deps to bypass stale constraint.
+    pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels great-expectations==0.18.22
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: Production — minimal runtime image
@@ -44,10 +47,12 @@ RUN apt-get update && \
 # Create a non-root user
 RUN groupadd -r featureflow && useradd -r -g featureflow featureflow
 
-# Copy pre-compiled wheels and install — no network access needed
+# Install pre-compiled wheels — no network access, no dependency resolver conflicts
 COPY --from=builder /app/wheels /wheels
 COPY requirements.txt .
 RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt && \
+    # Install great-expectations without resolving its stale numpy<2 constraint
+    pip install --no-cache-dir --no-index --no-deps --find-links=/wheels great-expectations==0.18.22 && \
     rm -rf /wheels
 
 # Copy application code

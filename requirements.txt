@@ -160,3 +160,10 @@ Werkzeug==3.1.8
 pywin32==312; platform_system=="Windows"
 pywinpty==3.0.5; platform_system=="Windows"
 colorama==0.4.6; platform_system=="Windows"
+
+# ── NOTE: great-expectations MUST be installed with --no-deps ─────────────────
+# great-expectations==0.18.22 declares numpy<2.0.0 in its metadata for Python 3.12,
+# but works correctly at runtime with numpy 2.x. Since scipy and shap require
+# numpy>=2.0.0, we install GE separately using --no-deps to bypass the stale
+# metadata constraint. See Dockerfile for the install sequence.
+# DO NOT add great-expectations==0.18.22 here — it is handled in the Dockerfile.
