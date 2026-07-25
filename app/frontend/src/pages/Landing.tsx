@@ -10,9 +10,8 @@ export const Landing = () => {
       
       <header className="relative z-10 container mx-auto px-6 py-6 flex items-center justify-between">
         <div className="text-2xl font-bold tracking-tight text-white">FeatureFlow<span className="text-indigo-500">.</span></div>
-        <div className="flex items-center gap-4">
-          <Link to="/login" className="text-sm font-medium text-neutral-300 hover:text-white transition-colors">Sign In</Link>
-          <Link to="/login" className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium text-white transition-colors">Get Started</Link>
+        <div className="flex items-center gap-6">
+          <Link to="/platform/dashboard" className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium text-white transition-colors">Launch Platform</Link>
         </div>
       </header>
 
@@ -32,8 +31,9 @@ export const Landing = () => {
         </p>
         
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link to="/login" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center justify-center gap-2 transition-all hover:scale-105">
-            Launch Platform <ArrowRight size={18} />
+          <Link to="/platform/dashboard" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center justify-center gap-2 transition-all hover:scale-105">
+            Launch FeatureFlow
+            <ArrowRight size={20} />
           </Link>
           <a href="#features" className="w-full sm:w-auto px-8 py-4 rounded-xl bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white font-semibold transition-all">
             View Features

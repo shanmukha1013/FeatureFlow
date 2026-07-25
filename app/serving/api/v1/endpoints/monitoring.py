@@ -6,19 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.storage.database import get_db
 from app.monitoring.schemas import MonitoringRunRequest, MonitoringReportResponse
 from app.monitoring.service import MonitoringService
-from app.security.dependencies import RequireRole
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
-
-require_admin = RequireRole(["ADMIN"])
 
 
 @router.post("/run", response_model=MonitoringReportResponse)
 async def run_drift_analysis(
     request: MonitoringRunRequest,
-    db: AsyncSession = Depends(get_db),
-    # Optional: protect this endpoint so only admins can trigger heavy jobs
-    current_user: dict = Depends(require_admin)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Triggers an asynchronous-style (but currently blocking for fast track) Evidently AI drift analysis

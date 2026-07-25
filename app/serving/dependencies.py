@@ -20,7 +20,7 @@ _validator = RequestValidator()
 async def get_cached_predictor(alias: str = "default") -> ModelPredictor:
     from app.inference.exceptions import InferenceError
     engine = get_prediction_engine()
-    
+
     # Lazy load models into memory on first request
     if not engine.predictors:
         await engine.start()

@@ -18,26 +18,18 @@ import { Settings } from './pages/Settings';
 import { Monitoring } from './pages/Monitoring';
 import { Landing } from './pages/Landing';
 
-import { AuthProvider } from './auth/AuthContext';
-import { ProtectedRoute } from './auth/ProtectedRoute';
-import { Login } from './pages/Login';
-import { Setup } from './pages/Setup';
+
 import { PlatformProvider } from './contexts/PlatformContext';
 
 const App = () => {
   return (
-    <AuthProvider>
+    <>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/setup" element={<Setup />} />
-        
         <Route path="/platform" element={
-          <ProtectedRoute>
             <PlatformProvider>
               <AppLayout />
             </PlatformProvider>
-          </ProtectedRoute>
         }>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="enterprise" element={<Enterprise />} />
@@ -59,7 +51,7 @@ const App = () => {
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </AuthProvider>
+    </>
   );
 };
 

@@ -1,16 +1,14 @@
 """
 Assembles all management endpoints under a secured router.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from .endpoints import overview_router, registries_router, pipelines_router, observability_router
 from .endpoints.retraining import router as retraining_router
 from .endpoints.enterprise import router as enterprise_router
-from app.security.dependencies import RequireRole, get_current_user
 
 management_router = APIRouter(
     prefix="/management",
-    tags=["management"],
-    dependencies=[Depends(get_current_user), Depends(RequireRole(["ADMIN", "ML_ENGINEER"]))]
+    tags=["management"]
 )
 
 management_router.include_router(overview_router)

@@ -344,104 +344,9 @@ class AuditLog(Base):
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
-class Role(Base):
-    __tablename__ = "roles"
-    id = Column(String, primary_key=True, default=gen_uuid)
-    name = Column(String, unique=True, nullable=False, index=True)
-    description = Column(String, nullable=True)
-    status = Column(String, default="ACTIVE", index=True)
-    version = Column(Integer, default=1)
-    created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-
-    users = relationship("User", back_populates="role")
-    role_permissions = relationship("RolePermission", back_populates="role", cascade="all, delete-orphan")
-
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(String, primary_key=True, default=gen_uuid)
-    username = Column(String, unique=True, nullable=False, index=True)
-    email = Column(String, unique=True, nullable=False, index=True)
-    hashed_password = Column(String, nullable=False)
-    role_id = Column(String, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True, index=True)
-
-    # Advanced Security Fields
-    status = Column(String, default="ACTIVE", index=True)  # ACTIVE, DISABLED, LOCKED, PENDING_VERIFICATION, DELETED
-    failed_login_attempts = Column(Integer, default=0)
-    account_locked_until = Column(DateTime(timezone=True), nullable=True)
-    last_login = Column(DateTime(timezone=True), nullable=True)
-    mfa_enabled = Column(Boolean, default=False)
-    mfa_secret = Column(String, nullable=True)  # Architecture stub
-
-    version = Column(Integer, default=1)
-    created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-
-    role = relationship("Role", back_populates="users")
-    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
-    api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
-    password_history = relationship("PasswordHistory", back_populates="user", cascade="all, delete-orphan")
-
-
-class Permission(Base):
-    __tablename__ = "permissions"
-    id = Column(String, primary_key=True, default=gen_uuid)
-    action = Column(String, nullable=False)  # e.g. 'read', 'write', 'delete'
-    resource = Column(String, nullable=False)  # e.g. 'models', 'datasets'
-    description = Column(String, nullable=True)
-    status = Column(String, default="ACTIVE", index=True)
-    version = Column(Integer, default=1)
-    created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-
-    __table_args__ = (UniqueConstraint('action', 'resource', name='uq_permission_action_resource'),)
-    role_permissions = relationship("RolePermission", back_populates="permission", cascade="all, delete-orphan")
-
-
-class RolePermission(Base):
-    __tablename__ = "role_permissions"
-    id = Column(String, primary_key=True, default=gen_uuid)
-    role_id = Column(String, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False, index=True)
-    permission_id = Column(String, ForeignKey("permissions.id", ondelete="CASCADE"), nullable=False, index=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
-
-    __table_args__ = (UniqueConstraint('role_id', 'permission_id', name='uq_role_permission'),)
-    role = relationship("Role", back_populates="role_permissions")
-    permission = relationship("Permission", back_populates="role_permissions")
-
-
-class UserSession(Base):
-    __tablename__ = "user_sessions"
-    id = Column(String, primary_key=True, default=gen_uuid)
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    session_id = Column(String, unique=True, nullable=False, index=True)  # JTI equivalent
-    refresh_token = Column(String, unique=True, index=True, nullable=False)
-    device = Column(String, nullable=True)
-    ip_address = Column(String, nullable=True)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    is_revoked = Column(Boolean, default=False)
-    last_activity = Column(DateTime(timezone=True), default=utcnow)
-    created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-
-    user = relationship("User", back_populates="sessions")
-
-
-class PasswordHistory(Base):
-    __tablename__ = "password_history"
-    id = Column(String, primary_key=True, default=gen_uuid)
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    hashed_password = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
-
-    user = relationship("User", back_populates="password_history")
-
-
 class ApiKey(Base):
     __tablename__ = "api_keys"
     id = Column(String, primary_key=True, default=gen_uuid)
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String, nullable=False)
     key_hash = Column(String, nullable=False, unique=True, index=True)
     scopes = Column(JSONB, nullable=True)  # Optional fine-grained permissions
@@ -450,8 +355,6 @@ class ApiKey(Base):
     last_used_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-
-    user = relationship("User", back_populates="api_keys")
 
 
 class SystemMetric(Base):
@@ -481,7 +384,6 @@ class ExplanationMetadata(Base):
     id = Column(String, primary_key=True, default=gen_uuid)
     prediction_id = Column(String, index=True, nullable=False)
     model_id = Column(String, ForeignKey("models.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     generation_time_ms = Column(Float, nullable=True)
     execution_time = Column(DateTime(timezone=True), default=utcnow)
     cache_status = Column(String, default="MISS", index=True)

@@ -15,7 +15,6 @@ from app.explainability.schemas import (
 )
 from app.explainability.cache import get_explanation_cache
 from app.explainability.manager import ExplanationManager
-from app.security.dependencies import RequireRole
 
 router = APIRouter(prefix="/explanations", tags=["explainability"])
 
@@ -23,8 +22,7 @@ router = APIRouter(prefix="/explanations", tags=["explainability"])
 @router.get("/{prediction_id}", response_model=ExplanationResponse)
 async def get_explanation(
     prediction_id: str,
-    db: AsyncSession = Depends(get_db),
-    user: dict = Depends(RequireRole(["ADMIN", "ML_ENGINEER", "DATA_SCIENTIST", "VIEWER"]))
+    db: AsyncSession = Depends(get_db)
 ):
     """Retrieve an explanation for a specific prediction ID."""
     result = await db.execute(
@@ -34,19 +32,6 @@ async def get_explanation(
 
     if not meta:
         raise HTTPException(status_code=404, detail="Explanation not found or still generating.")
-
-    user_id = user["id"] if isinstance(user, dict) else user.id
-
-    user_role = ""
-    if isinstance(user, dict):
-        user_role = user.get("role", "")
-    else:
-        from app.storage.models import Role
-        role_result = await db.execute(select(Role.name).filter(Role.id == user.role_id))
-        user_role = role_result.scalar_one_or_none()
-
-    if user_role == "VIEWER" and meta.user_id != user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to view this explanation.")
 
     return ExplanationResponse(
         prediction_id=meta.prediction_id,
@@ -68,8 +53,7 @@ async def get_explanation(
 async def get_explanation_history(
     model_id: str,
     limit: int = 50,
-    db: AsyncSession = Depends(get_db),
-    user: dict = Depends(RequireRole(["ADMIN", "ML_ENGINEER", "DATA_SCIENTIST"]))
+    db: AsyncSession = Depends(get_db)
 ):
     """Retrieve historical explanations for a specific model."""
     result = await db.execute(
@@ -101,8 +85,7 @@ async def get_explanation_history(
 @router.get("/global/{model_id}", response_model=GlobalExplanationResponse)
 async def get_global_explanation(
     model_id: str,
-    db: AsyncSession = Depends(get_db),
-    user: dict = Depends(RequireRole(["ADMIN", "ML_ENGINEER", "DATA_SCIENTIST", "VIEWER"]))
+    db: AsyncSession = Depends(get_db)
 ):
     """Retrieve global explainability metrics for a model."""
     result = await db.execute(
@@ -127,8 +110,7 @@ async def get_global_explanation(
 
 @router.get("/statistics", response_model=ExplanationStatisticsResponse)
 async def get_statistics(
-    db: AsyncSession = Depends(get_db),
-    user: dict = Depends(RequireRole(["ADMIN", "ML_ENGINEER"]))
+    db: AsyncSession = Depends(get_db)
 ):
     """Retrieve global explanation statistics across the platform."""
     total = await db.execute(select(func.count()).select_from(ExplanationMetadata))
@@ -153,8 +135,7 @@ async def get_statistics(
 @router.post("/generate")
 async def generate_explanation(
     payload: GenerateExplanationRequest,
-    background_tasks: BackgroundTasks,
-    user: dict = Depends(RequireRole(["ADMIN", "ML_ENGINEER"]))
+    background_tasks: BackgroundTasks
 ):
     """Off-cycle background generation for an existing prediction."""
     # To generate, we need the original features from PredictionCache
@@ -174,8 +155,6 @@ async def generate_explanation(
     f_ver = str(predictor.metadata.version) if (predictor.metadata and predictor.metadata.dataset_id) else "1"
 
     mgr = ExplanationManager()
-    user_id = user["id"] if isinstance(user, dict) else user.id
-
     background_tasks.add_task(
         mgr.generate_background,
         prediction_id=payload.prediction_id,
@@ -183,8 +162,7 @@ async def generate_explanation(
         m_ver=m_ver,
         f_ver=f_ver,
         features=payload.features,
-        predictor=predictor,
-        user_id=user_id
+        predictor=predictor
     )
 
     return {"status": "generating", "prediction_id": payload.prediction_id, "poll_url": f"/api/v1/explanations/{payload.prediction_id}"}
@@ -192,8 +170,7 @@ async def generate_explanation(
 
 @router.get("/cache", response_model=CacheStatisticsResponse)
 async def get_cache_stats(
-    db: AsyncSession = Depends(get_db),
-    user: dict = Depends(RequireRole(["ADMIN", "ML_ENGINEER"]))
+    db: AsyncSession = Depends(get_db)
 ):
     """Retrieve explanation cache statistics."""
     cache = get_explanation_cache()
@@ -220,9 +197,7 @@ async def get_cache_stats(
 
 
 @router.delete("/cache", status_code=status.HTTP_204_NO_CONTENT)
-async def clear_cache(
-    user: dict = Depends(RequireRole(["ADMIN", "ML_ENGINEER"]))
-):
+async def clear_cache():
     """Invalidate all cached explanations."""
     cache = get_explanation_cache()
     if cache.redis.client:

@@ -85,50 +85,10 @@ async def init_db():
     """
     try:
         # Import models so they are registered with Base.metadata before creating tables
-        from app.storage.models import Role, Permission, RolePermission, User
-        from app.security.auth import get_password_hash
-        from sqlalchemy.future import select
-
         async with engine.begin() as conn:
             # Create tables if they don't exist
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Successfully initialized database tables.")
-
-        # Seed RBAC and Admin
-        async with AsyncSessionLocal() as session:
-            # Roles
-            admin_role = await session.execute(select(Role).filter_by(name="ADMIN"))
-            admin_role = admin_role.scalar_one_or_none()
-            if not admin_role:
-                admin_role = Role(name="ADMIN", description="Superuser")
-                ml_role = Role(name="ML_ENGINEER", description="Can manage ML pipelines")
-                ds_role = Role(name="DATA_SCIENTIST", description="Can run experiments")
-                viewer_role = Role(name="VIEWER", description="Read-only access")
-                session.add_all([admin_role, ml_role, ds_role, viewer_role])
-                await session.flush()
-
-                # We can seed specific permissions later if needed, but ADMIN gets a * wildcard for now
-                admin_perm = Permission(action="*", resource="*", description="Full Access")
-                session.add(admin_perm)
-                await session.flush()
-
-                session.add(RolePermission(role_id=admin_role.id, permission_id=admin_perm.id))
-
-                # Admin user
-                if settings.default_admin_password:
-                    admin_user = User(
-                        username="admin",
-                        email=settings.default_admin_email or "admin@featureflow.local",
-                        hashed_password=get_password_hash(settings.default_admin_password),
-                        role_id=admin_role.id,
-                        status="ACTIVE"
-                    )
-                    session.add(admin_user)
-                    await session.commit()
-                    logger.info("Seeded default roles and admin user.")
-                else:
-                    await session.commit()
-                    logger.info("Seeded default roles. Setup required to create first admin.")
 
     except Exception as e:
         logger.exception(f"Database connection or table creation failed: {e}")

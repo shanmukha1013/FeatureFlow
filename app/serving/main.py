@@ -21,9 +21,6 @@ import asyncio
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.storage.database import init_db
-    import threading
-    from app.data.discovery import DatasetDiscovery
-    from app.serving.dependencies import _prediction_engine
     from app.cache import RedisClient
     from app.cache.health_monitor import get_health_monitor
     from app.cache.recovery_manager import get_recovery_manager
@@ -38,17 +35,13 @@ async def lifespan(app: FastAPI):
 
     # Phase 13A: Startup Validation
     async def validate_startup():
-        from app.config import settings
         import sys
         import os
         import mlflow
+        from app.config import settings
 
         try:
-            # 1. Environment variables
-            if not settings.jwt_secret_keys or settings.jwt_secret_keys == "featureflow-default-dev-secret-key-32b":
-                if settings.is_production:
-                    print("CRITICAL: Production JWT secret key is missing or insecure.", file=sys.stderr)
-                    sys.exit(1)
+            # 1. Environment variables (No longer requires JWT)
 
             # 2. PostgreSQL
             try:
@@ -113,14 +106,10 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
-    import sys
-    import os
-    from app.config import settings
-
     # Phase 12: Start system metrics collection in background
     metrics_task = asyncio.create_task(collect_system_metrics())
 
-    # Note: Dataset discovery (run_discovery) has been removed from startup 
+    # Note: Dataset discovery (run_discovery) has been removed from startup
     # to dramatically reduce memory footprint on Render Free tier (512MB RAM).
     # Heavy tasks like profiling should be triggered via API, not on boot.
 
@@ -195,13 +184,9 @@ FeatureFlow is a production-grade ML platform for feature management, real-time 
 
     # Register metrics endpoint
     from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-    from fastapi import Response, Depends
-    from app.config import settings
-    from app.security.dependencies import get_current_user
+    from fastapi import Response
 
-    metrics_deps = [Depends(get_current_user)] if settings.enable_metrics_auth else []
-
-    @app.get("/metrics", tags=["observability"], dependencies=metrics_deps)
+    @app.get("/metrics", tags=["observability"])
     def metrics():
         return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 

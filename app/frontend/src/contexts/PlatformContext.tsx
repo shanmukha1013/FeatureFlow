@@ -1,10 +1,7 @@
 import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
-import { UserProfile } from '../auth/authTypes';
-import { authService } from '../auth/authService';
 import { apiClient } from '../api/client';
 
 interface PlatformContextType {
-  user: UserProfile | null;
   models: any[];
   stats: any | null;
   refreshBootstrap: () => Promise<void>;
@@ -21,7 +18,6 @@ export const usePlatform = () => {
 };
 
 export const PlatformProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
   const [models, setModels] = useState<any[]>([]);
   const [stats, setStats] = useState<any | null>(null);
 
@@ -30,10 +26,6 @@ export const PlatformProvider = ({ children }: { children: ReactNode }) => {
 
   const bootstrap = async () => {
     try {
-      setLoadingStep(1); // Loading User
-      const userProfile = await authService.me();
-      setUser(userProfile);
-
       setLoadingStep(2); // Loading Platform/Stats
       try {
         const [platformRes, statsRes] = await Promise.all([
@@ -70,8 +62,7 @@ export const PlatformProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   if (loadingStep < 5) {
-    let message = "Authenticating...";
-    if (loadingStep === 1) message = "Loading User Profile...";
+    let message = "Loading...";
     if (loadingStep === 2) message = "Loading Platform...";
     if (loadingStep === 3) message = "Loading Models...";
     if (loadingStep === 4) message = "Preparing Dashboard...";
@@ -98,7 +89,7 @@ export const PlatformProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <PlatformContext.Provider value={{ user, models, stats, refreshBootstrap: bootstrap }}>
+    <PlatformContext.Provider value={{ models, stats, refreshBootstrap: bootstrap }}>
       {children}
     </PlatformContext.Provider>
   );

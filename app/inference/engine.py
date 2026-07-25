@@ -53,7 +53,7 @@ class PredictionEngine:
         champion_meta = None
 
         # Requirement 3 & Phase 4 Requirement 9: Synchronize Redis Model & Prediction Caches
-        # NOTE: Eager cache warming has been disabled to reduce startup memory spikes 
+        # NOTE: Eager cache warming has been disabled to reduce startup memory spikes
         # on Render Free Tier (512MB RAM). Caches will populate lazily on first request.
         try:
             from app.cache.model_cache import get_model_registry_cache

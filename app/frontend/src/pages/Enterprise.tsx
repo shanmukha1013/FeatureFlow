@@ -3,15 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
 import { LoadingSpinner } from '../components/States';
-import { Shield, Database, Zap, Activity, Users, Split } from 'lucide-react';
+import { Shield, Database, Zap, Activity, Split } from 'lucide-react';
 
 export const Enterprise = () => {
-  const [activeTab, setActiveTab] = useState<'deployments' | 'featurestore' | 'security'>('deployments');
+  const [activeTab, setActiveTab] = useState<'deployments' | 'featurestore'>('deployments');
 
   const { data: champion } = useQuery({ queryKey: ['champion'], queryFn: () => apiClient.get('/management/champion').then(res => res.data).catch(() => null) });
   const { data: challengers } = useQuery({ queryKey: ['challengers'], queryFn: () => apiClient.get('/management/challengers').then(res => res.data.items).catch(() => []) });
   const { data: cacheStats } = useQuery({ queryKey: ['cache'], queryFn: () => apiClient.get('/management/cache').then(res => res.data).catch(() => null) });
-  const { data: users } = useQuery({ queryKey: ['users'], queryFn: () => apiClient.get('/management/users').then(res => res.data.items).catch(() => []) });
+
 
   return (
     <div className="space-y-6 animate-in fade-in pb-12 max-w-6xl">
@@ -20,7 +20,7 @@ export const Enterprise = () => {
       <div className="flex border-b border-border mb-6 space-x-6">
         <button onClick={() => setActiveTab('deployments')} className={`pb-3 text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'deployments' ? 'text-primary border-b-2 border-primary' : 'text-muted hover:text-white'}`}><Split size={16} /> Deployments & Routing</button>
         <button onClick={() => setActiveTab('featurestore')} className={`pb-3 text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'featurestore' ? 'text-primary border-b-2 border-primary' : 'text-muted hover:text-white'}`}><Database size={16} /> Feature Stores</button>
-        <button onClick={() => setActiveTab('security')} className={`pb-3 text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'security' ? 'text-primary border-b-2 border-primary' : 'text-muted hover:text-white'}`}><Shield size={16} /> Security & RBAC</button>
+
       </div>
 
       {activeTab === 'deployments' && (
@@ -76,29 +76,6 @@ export const Enterprise = () => {
         </div>
       )}
 
-      {activeTab === 'security' && (
-        <div className="space-y-6">
-          <div className="bg-surface border border-border p-6 rounded-lg space-y-4">
-            <h2 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2"><Shield size={16}/> JWT Authentication</h2>
-            <div className="text-sm text-muted p-4 border border-border bg-[#0a0a0a] rounded-md">
-              All management API routes are strictly protected via Bearer Tokens and Role-Based Access Control (RBAC). 
-              Currently running in Demo Bypass mode for UI rendering.
-            </div>
-          </div>
-
-          <div className="bg-surface border border-border p-6 rounded-lg space-y-4">
-            <h2 className="text-sm font-semibold text-white uppercase tracking-wider flex items-center gap-2"><Users size={16}/> Registered Users</h2>
-            <div className="space-y-2">
-              {users?.map((u: any, i: number) => (
-                <div key={i} className="p-3 bg-[#0a0a0a] border border-border rounded-md flex justify-between items-center">
-                  <span className="text-sm text-white font-medium">{u.username}</span>
-                  <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-muted">{u.role}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

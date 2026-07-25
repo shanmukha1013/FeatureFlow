@@ -47,21 +47,8 @@ class Settings:
     redis_benchmark_iterations: int = int(os.getenv("REDIS_BENCHMARK_ITERATIONS", "100"))
     redis_slow_command_threshold_ms: float = float(os.getenv("REDIS_SLOW_COMMAND_THRESHOLD_MS", "100.0"))
 
-    # Phase 6: Enterprise Authentication & Security
-    jwt_secret_keys: str = os.getenv("JWT_SECRET_KEYS")
-    jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
-    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-    refresh_token_expire_days: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
-
-    default_admin_email: str = os.getenv("DEFAULT_ADMIN_EMAIL")
-    default_admin_password: str = os.getenv("DEFAULT_ADMIN_PASSWORD")
-    bcrypt_rounds: int = int(os.getenv("BCRYPT_ROUNDS", "12"))
-
-    max_login_attempts: int = int(os.getenv("MAX_LOGIN_ATTEMPTS", "5"))
-
     # Observability Configuration
-    enable_metrics_auth: bool = os.getenv("ENABLE_METRICS_AUTH", "False").lower() in ("true", "1", "yes")
-    lockout_duration_minutes: int = int(os.getenv("LOCKOUT_DURATION_MINUTES", "15"))
+    enable_metrics_auth: bool = False
 
     # CORS Configuration
     cors_origins: str = os.getenv("CORS_ORIGINS", "*")

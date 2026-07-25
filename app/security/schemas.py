@@ -1,40 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    expires_in: int
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class RegisterRequest(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
-class UserProfile(BaseModel):
-    id: str
-    username: str
-    email: EmailStr
-    status: str
-    role: Optional[str]
-    permissions: List[str]
-    mfa_enabled: bool
-    created_at: datetime
-    last_login: Optional[datetime]
 
 
 class ApiKeyCreate(BaseModel):
@@ -58,15 +24,4 @@ class ApiKeyMetaResponse(BaseModel):
     expires_at: Optional[datetime]
     created_at: datetime
     last_used_at: Optional[datetime]
-    is_revoked: bool
-
-
-class SessionMetaResponse(BaseModel):
-    id: str
-    session_id: str
-    device: Optional[str]
-    ip_address: Optional[str]
-    created_at: datetime
-    last_activity: datetime
-    expires_at: datetime
     is_revoked: bool

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Database, Activity, Box, Cpu, FileJson, PlaySquare, Settings, HeartPulse, Shield, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, Database, Activity, Box, Cpu, FileJson, PlaySquare, Settings, HeartPulse, Shield } from 'lucide-react';
 import { usePlatform } from '../contexts/PlatformContext';
-import { useAuth } from '../auth/hooks';
 
 export const Sidebar = () => {
   const links = [
@@ -48,15 +47,6 @@ export const Sidebar = () => {
 };
 
 export const AppLayout = () => {
-  const { user } = usePlatform();
-  const { logout } = useAuth();
-  const navigate = useNavigate();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans">
@@ -72,35 +62,9 @@ export const AppLayout = () => {
           </div>
           
           <div className="relative">
-            <button 
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-neutral-900 transition-colors focus:outline-none"
-            >
-              <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
-                <User size={16} />
-              </div>
-              <div className="text-left hidden sm:block">
-                <div className="text-sm font-medium text-neutral-200 leading-none">{user?.username || 'User'}</div>
-                <div className="text-xs text-neutral-500 mt-1">{user?.role || 'Admin'}</div>
-              </div>
-            </button>
-            
-            {isMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}></div>
-                <div className="absolute right-0 mt-2 w-48 bg-[#1a1a1a] border border-neutral-800 rounded-xl shadow-2xl z-50 py-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="px-4 py-2 border-b border-neutral-800 mb-1">
-                    <p className="text-sm font-medium text-white truncate">{user?.email || 'admin@featureflow.io'}</p>
-                  </div>
-                  <button onClick={() => { setIsMenuOpen(false); navigate('/settings'); }} className="w-full text-left px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors flex items-center gap-2">
-                    <Settings size={14} /> Settings
-                  </button>
-                  <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2">
-                    <LogOut size={14} /> Logout
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-400">
+               <div className="text-sm font-medium leading-none">Single-User Mode</div>
+            </div>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-8 bg-[#0a0a0a]">

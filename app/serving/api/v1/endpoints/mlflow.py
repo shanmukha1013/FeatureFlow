@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from app.storage.database import get_db
-from app.security.dependencies import RequireRole
 from app.mlflow.schemas import (
     MLflowTrainRequest,
     MLflowTrainResponse,
@@ -16,11 +15,8 @@ from app.mlflow.service import MLflowService
 
 router = APIRouter(prefix="/mlflow", tags=["mlflow"])
 
-require_ml_engineer = RequireRole(["ADMIN", "ML_ENGINEER", "DATA_SCIENTIST"])
-require_admin = RequireRole(["ADMIN", "ML_ENGINEER"])
 
-
-@router.post("/train", response_model=MLflowTrainResponse, dependencies=[Depends(require_ml_engineer)])
+@router.post("/train", response_model=MLflowTrainResponse)
 async def run_training(
     request: MLflowTrainRequest,
     db: AsyncSession = Depends(get_db)
@@ -47,7 +43,7 @@ async def run_training(
         )
 
 
-@router.get("/experiments", dependencies=[Depends(require_ml_engineer)])
+@router.get("/experiments")
 async def list_experiments(db: AsyncSession = Depends(get_db)):
     service = MLflowService(db)
     try:
@@ -57,7 +53,7 @@ async def list_experiments(db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/runs/{run_id}", response_model=MLflowRunResponse, dependencies=[Depends(require_ml_engineer)])
+@router.get("/runs/{run_id}", response_model=MLflowRunResponse)
 async def get_run(run_id: str, db: AsyncSession = Depends(get_db)):
     service = MLflowService(db)
     try:
@@ -73,7 +69,7 @@ async def get_run(run_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Run not found: {e}")
 
 
-@router.get("/models", dependencies=[Depends(require_ml_engineer)])
+@router.get("/models")
 async def list_models(db: AsyncSession = Depends(get_db)):
     service = MLflowService(db)
     try:
@@ -83,7 +79,7 @@ async def list_models(db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/models/promote", response_model=MLflowPromoteResponse, dependencies=[Depends(require_admin)])
+@router.post("/models/promote", response_model=MLflowPromoteResponse)
 async def promote_model(
     request: MLflowPromoteRequest,
     db: AsyncSession = Depends(get_db)
@@ -108,7 +104,7 @@ async def promote_model(
         )
 
 
-@router.get("/models/{name}/latest", response_model=MLflowModelResponse, dependencies=[Depends(require_ml_engineer)])
+@router.get("/models/{name}/latest", response_model=MLflowModelResponse)
 async def get_latest_model(name: str, db: AsyncSession = Depends(get_db)):
     service = MLflowService(db)
     model_info = service.get_latest_model(name)

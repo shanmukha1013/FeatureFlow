@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.storage.database import get_db
-from app.security.dependencies import get_current_user
 from app.data_quality.models import DataContractModel, ValidationRun, ExpectationSuiteModel
 from app.data_quality.schemas import DataContractResponse, ValidationRunResponse
 from app.data_quality.manager import DataQualityCacheManager
@@ -18,8 +17,7 @@ async def list_data_contracts(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, le=100),
     dataset_name: str = None,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     stmt = select(DataContractModel).order_by(desc(DataContractModel.created_at))
     if dataset_name:
@@ -32,8 +30,7 @@ async def list_data_contracts(
 @router.get("/health/{dataset_name}")
 async def get_dataset_health(
     dataset_name: str,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     # 1. Try cache
     cache = DataQualityCacheManager()
@@ -59,8 +56,7 @@ async def get_dataset_health(
 @router.get("/runs/{dataset_version_id}", response_model=List[ValidationRunResponse])
 async def list_validation_runs(
     dataset_version_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     stmt = select(ValidationRun).filter_by(dataset_version_id=dataset_version_id).order_by(desc(ValidationRun.created_at))
     result = await db.execute(stmt)
