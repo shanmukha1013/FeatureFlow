@@ -14,7 +14,7 @@ export const AuditLogs = () => {
   });
 
   if (isLoading) return <LoadingSpinner message="Loading audit logs..." />;
-  if (error) return <ErrorState message="Could not connect to Management API." />;
+  if (error) return <ErrorState message="Failed to load data." />;
 
   const columns = [
     { header: 'Timestamp', accessor: (r: any) => <span className="text-muted">{new Date(r.timestamp).toLocaleString()}</span> },

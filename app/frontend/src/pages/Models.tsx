@@ -13,7 +13,7 @@ export const Models = () => {
   });
 
   if (isLoading) return <LoadingSpinner message="Loading model registry..." />;
-  if (error) return <ErrorState message="Could not connect to Management API." />;
+  if (error) return <ErrorState message="Failed to load data." />;
 
   const columns = [
     { header: 'Model', accessor: (r: any) => (

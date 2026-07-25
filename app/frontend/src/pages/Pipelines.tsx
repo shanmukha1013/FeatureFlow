@@ -13,7 +13,7 @@ export const Pipelines = () => {
   });
 
   if (isLoading) return <LoadingSpinner message="Loading pipeline history..." />;
-  if (error) return <ErrorState message="Could not connect to Management API." />;
+  if (error) return <ErrorState message="Failed to load data." />;
 
   const columns = [
     { header: 'Pipeline Run', accessor: (r: any) => <span className="font-medium text-white">{r.pipeline_name}</span> },

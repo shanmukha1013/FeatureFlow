@@ -13,7 +13,7 @@ export const Features = () => {
   });
 
   if (isLoading) return <LoadingSpinner message="Loading feature registry..." />;
-  if (error) return <ErrorState message="Could not connect to Management API." />;
+  if (error) return <ErrorState message="Failed to load data." />;
 
   const columns = [
     { header: 'Feature Name', accessor: (r: any) => <span className="font-medium text-white">{r.name}</span> },

@@ -12,7 +12,7 @@ export const Monitoring = () => {
   });
 
   if (isLoading) return <LoadingSpinner message="Loading monitoring data..." />;
-  if (error) return <ErrorState message="Could not connect to Management API." />;
+  if (error) return <ErrorState message="Failed to load data." />;
 
   return (
     <div className="space-y-6 animate-in fade-in">

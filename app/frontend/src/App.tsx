@@ -16,29 +16,48 @@ import { Pipelines } from './pages/Pipelines';
 import { Health } from './pages/Health';
 import { Settings } from './pages/Settings';
 import { Monitoring } from './pages/Monitoring';
+import { Landing } from './pages/Landing';
+
+import { AuthProvider } from './auth/AuthContext';
+import { ProtectedRoute } from './auth/ProtectedRoute';
+import { Login } from './pages/Login';
+import { PlatformProvider } from './contexts/PlatformContext';
 
 const App = () => {
   return (
-    <Routes>
-      <Route path="/" element={<AppLayout />}>
-        <Route index element={<Dashboard />} />
-        <Route path="enterprise" element={<Enterprise />} />
-        <Route path="retraining" element={<Retraining />} />
-        <Route path="experiments" element={<Experiments />} />
-        <Route path="inference" element={<Inference />} />
-        <Route path="explainability" element={<Explainability />} />
-        <Route path="drift" element={<Drift />} />
-        <Route path="models" element={<Models />} />
-        <Route path="monitoring" element={<Monitoring />} />
-        <Route path="audit" element={<AuditLogs />} />
-        <Route path="datasets" element={<Datasets />} />
-        <Route path="features" element={<Features />} />
-        <Route path="pipelines" element={<Pipelines />} />
-        <Route path="health" element={<Health />} />
-        <Route path="settings" element={<Settings />} />
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        
+        <Route path="/platform" element={
+          <ProtectedRoute>
+            <PlatformProvider>
+              <AppLayout />
+            </PlatformProvider>
+          </ProtectedRoute>
+        }>
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="enterprise" element={<Enterprise />} />
+          <Route path="retraining" element={<Retraining />} />
+          <Route path="experiments" element={<Experiments />} />
+          <Route path="inference" element={<Inference />} />
+          <Route path="explainability" element={<Explainability />} />
+          <Route path="drift" element={<Drift />} />
+          <Route path="models" element={<Models />} />
+          <Route path="monitoring" element={<Monitoring />} />
+          <Route path="audit" element={<AuditLogs />} />
+          <Route path="datasets" element={<Datasets />} />
+          <Route path="features" element={<Features />} />
+          <Route path="pipelines" element={<Pipelines />} />
+          <Route path="health" element={<Health />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/platform/dashboard" replace />} />
+        </Route>
+        
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Route>
-    </Routes>
+      </Routes>
+    </AuthProvider>
   );
 };
 

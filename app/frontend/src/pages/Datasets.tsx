@@ -13,7 +13,7 @@ export const Datasets = () => {
   });
 
   if (isLoading) return <LoadingSpinner message="Loading datasets..." />;
-  if (error) return <ErrorState message="Could not connect to Management API." />;
+  if (error) return <ErrorState message="Failed to load data." />;
 
   const columns = [
     { header: 'Dataset Name', accessor: (r: any) => <span className="font-medium text-white">{r.dataset_name}</span> },
