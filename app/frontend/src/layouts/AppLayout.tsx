@@ -8,33 +8,33 @@ import {
 } from 'lucide-react';
 
 const NAVIGATION = [
-  // Operations
-  { section: 'Operations', items: [
-    { name: 'Command Center', path: '/platform/dashboard', icon: LayoutDashboard },
-    { name: 'Digital Twin', path: '/platform/topology', icon: Network },
-    { name: 'Pipelines', path: '/platform/pipelines', icon: GitBranch },
-    { name: 'Monitoring', path: '/platform/monitoring', icon: BarChart3 },
-    { name: 'Audit Logs', path: '/platform/audit', icon: ClipboardList },
+  // Orchestration
+  { section: 'Orchestration', items: [
+    { name: 'Lifecycle Canvas', path: '/platform/canvas', icon: LayoutDashboard },
   ]},
-  // ML Lifecycle
-  { section: 'ML Lifecycle', items: [
+  // Data & Features
+  { section: 'Data & Features', items: [
     { name: 'Datasets', path: '/platform/datasets', icon: Database },
+    { name: 'Features', path: '/platform/features', icon: FileJson },
+    { name: 'Pipelines', path: '/platform/pipelines', icon: GitBranch },
+  ]},
+  // Models & Serving
+  { section: 'Models & Serving', items: [
     { name: 'Training', path: '/platform/training', icon: Cpu },
-    { name: 'Experiments', path: '/platform/experiments', icon: FlaskConical },
     { name: 'Models', path: '/platform/models', icon: Box },
     { name: 'Retraining', path: '/platform/retraining', icon: GitMerge },
-  ]},
-  // Serving & AI
-  { section: 'Serving & AI', items: [
     { name: 'Inference', path: '/platform/inference', icon: PlayCircle },
-    { name: 'Features', path: '/platform/features', icon: FileJson },
-    { name: 'Explainability', path: '/platform/explainability', icon: Eye },
-    { name: 'Drift Monitor', path: '/platform/drift', icon: TrendingDown },
   ]},
-  // Platform
-  { section: 'Platform', items: [
+  // Observability
+  { section: 'Observability', items: [
+    { name: 'Drift Monitor', path: '/platform/drift', icon: TrendingDown },
+    { name: 'Monitoring', path: '/platform/monitoring', icon: BarChart3 },
+    { name: 'Explainability', path: '/platform/explainability', icon: Eye },
+  ]},
+  // Enterprise
+  { section: 'Enterprise', items: [
+    { name: 'Audit Logs', path: '/platform/audit', icon: ClipboardList },
     { name: 'Enterprise MLOps', path: '/platform/enterprise', icon: Shield },
-    { name: 'Health', path: '/platform/health', icon: HeartPulse },
     { name: 'Settings', path: '/platform/settings', icon: Settings },
   ]},
 ];

@@ -20,6 +20,8 @@ class EventType(str, Enum):
     TRAINING_SERVING_SKEW_DETECTED = "Feature.TrainingServingSkewDetected"
 
     # ML Events
+    READY_FOR_TRAINING = "Job.ReadyForTraining"
+    READY_FOR_DEPLOYMENT = "Model.ReadyForDeployment"
     JOB_STARTED = "Job.Started"
     JOB_COMPLETED = "Job.Completed"
     JOB_FAILED = "Job.Failed"

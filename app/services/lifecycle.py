@@ -23,6 +23,7 @@ class LifecycleOrchestrator:
         self.bus.subscribe(EventType.DATASET_VALIDATED, self.handle_dataset_validated)
         self.bus.subscribe(EventType.FEATURES_REGISTERED, self.handle_features_registered)
         self.bus.subscribe(EventType.FEATURE_MATERIALIZED, self.handle_feature_materialized)
+        self.bus.subscribe(EventType.JOB_COMPLETED, self.handle_job_completed)
 
     async def handle_dataset_uploaded(self, event: Event):
         logger.info(f"[Lifecycle] Received DATASET_UPLOADED for {event.payload.get('dataset_name')}")
@@ -154,16 +155,30 @@ class LifecycleOrchestrator:
         dataset_id = event.payload.get("dataset_id")
         dataset_name = event.payload.get("dataset_name")
         
-        # Trigger Model Training
-        async with AsyncSessionLocal() as session:
-            from app.training.orchestrator import TrainingOrchestrator
-            from sqlalchemy.future import select
-            from app.storage.models import Dataset as DatasetModel
-            
-            result = await session.execute(select(DatasetModel).filter(DatasetModel.id == dataset_id))
-            dataset_record = result.scalars().first()
-            if dataset_record:
-                logger.info(f"[Lifecycle] Triggering background training for {dataset_name}")
-                orchestrator = TrainingOrchestrator()
-                # Run the orchestrator in the background
-                asyncio.create_task(orchestrator.execute(session, dataset_record, relative_path=""))
+        # Human-in-the-Loop Intelligence
+        # Instead of automatically orchestrating the training, we inform the Canvas
+        # that the Feature Group is materialized and recommend the next action (Training).
+        await self.bus.publish(Event(
+            type=EventType.READY_FOR_TRAINING,
+            source="lifecycle.orchestrator",
+            severity=EventSeverity.INFO,
+            payload={
+                "dataset_id": dataset_id,
+                "dataset_name": dataset_name,
+                "recommendation": "Features are fully materialized. Proceed to model training."
+            }
+        ))
+
+    async def handle_job_completed(self, event: Event):
+        logger.info(f"[Lifecycle] Received JOB_COMPLETED for model {event.payload.get('model_name')}")
+        
+        await self.bus.publish(Event(
+            type=EventType.READY_FOR_DEPLOYMENT,
+            source="lifecycle.orchestrator",
+            severity=EventSeverity.INFO,
+            payload={
+                "model_id": event.payload.get("model_id"),
+                "model_name": event.payload.get("model_name"),
+                "recommendation": "Training completed successfully. Review metrics and deploy to inference."
+            }
+        ))

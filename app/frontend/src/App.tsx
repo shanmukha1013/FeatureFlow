@@ -1,12 +1,10 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
-import { Dashboard } from './pages/Dashboard';
-import { DigitalTwin } from './pages/DigitalTwin';
+import { LifecycleCanvas } from './pages/LifecycleCanvas';
 import { Inference } from './pages/Inference';
 import { Models } from './pages/Models';
 import { AuditLogs } from './pages/AuditLogs';
-import { Experiments } from './pages/Experiments';
 import { Explainability } from './pages/Explainability';
 import { Drift } from './pages/Drift';
 import { Retraining } from './pages/Retraining';
@@ -14,11 +12,9 @@ import { Enterprise } from './pages/Enterprise';
 import { Datasets } from './pages/Datasets';
 import { Features } from './pages/Features';
 import { Pipelines } from './pages/Pipelines';
-import { Health } from './pages/Health';
 import { Settings } from './pages/Settings';
 import { Monitoring } from './pages/Monitoring';
 import { Training } from './pages/Training';
-
 
 import { PlatformProvider } from './contexts/PlatformContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
@@ -27,7 +23,7 @@ const App = () => {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Navigate to="/platform/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/platform/canvas" replace />} />
         <Route path="/platform" element={
             <PlatformProvider>
               <WebSocketProvider>
@@ -35,12 +31,10 @@ const App = () => {
               </WebSocketProvider>
             </PlatformProvider>
         }>
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="topology" element={<DigitalTwin />} />
+          <Route path="canvas" element={<LifecycleCanvas />} />
           <Route path="enterprise" element={<Enterprise />} />
           <Route path="training" element={<Training />} />
           <Route path="retraining" element={<Retraining />} />
-          <Route path="experiments" element={<Experiments />} />
           <Route path="inference" element={<Inference />} />
           <Route path="explainability" element={<Explainability />} />
           <Route path="drift" element={<Drift />} />
@@ -50,9 +44,8 @@ const App = () => {
           <Route path="datasets" element={<Datasets />} />
           <Route path="features" element={<Features />} />
           <Route path="pipelines" element={<Pipelines />} />
-          <Route path="health" element={<Health />} />
           <Route path="settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/platform/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/platform/canvas" replace />} />
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />
