@@ -68,7 +68,10 @@ protobuf==6.33.6
 
 # ── Data Quality & Monitoring ──────────────────────────────────────────────────
 evidently==0.7.21
-great-expectations==0.18.22
+# great-expectations is intentionally omitted here.
+# It declares numpy<2.0.0 metadata for Python 3.12, but works with numpy 2.x at runtime.
+# It is installed separately with `pip install --no-deps` in the Dockerfile.
+# See bottom of this file for explanation.
 statsmodels==0.14.6
 
 # ── Observability ──────────────────────────────────────────────────────────────
