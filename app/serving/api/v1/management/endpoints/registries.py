@@ -8,7 +8,7 @@ from sqlalchemy.future import select
 from sqlalchemy import desc
 
 from app.storage.database import get_db
-from app.storage.models import Dataset, Feature, Model, Experiment, ChampionModel, AuditLog
+from app.storage.models import Dataset, Feature, Model, Experiment, ChampionModel, AuditLog, DatasetVersion
 from app.serving.api.v1.management.schemas.pagination import PaginatedResponse
 
 router = APIRouter()
@@ -29,19 +29,58 @@ async def get_datasets(
     size: int = Query(50, ge=1, le=100),
     session: AsyncSession = Depends(get_db)
 ):
-    result = await session.execute(select(Dataset).order_by(desc(Dataset.created_at)))
+    result = await session.execute(
+        select(Dataset)
+        .filter(Dataset.status != "ARCHIVED")
+        .order_by(desc(Dataset.created_at))
+    )
     datasets = result.scalars().all()
+
     items = []
     for d in datasets:
+        # Get latest version
+        dv_res = await session.execute(
+            select(DatasetVersion)
+            .filter(DatasetVersion.dataset_id == d.id)
+            .order_by(desc(DatasetVersion.created_at))
+            .limit(1)
+        )
+        dv = dv_res.scalars().first()
+
+        # Get feature count
+        feat_res = await session.execute(
+            select(Feature)
+            .filter(Feature.dataset_id == d.id, Feature.status == "ACTIVE")
+        )
+        features = feat_res.scalars().all()
+
+        # Compute profile stats from inferred_dtypes
+        dtypes = d.inferred_dtypes or {}
+        numeric_cols = [col for col, dtype in dtypes.items() if 'int' in str(dtype) or 'float' in str(dtype)]
+
         items.append({
             "id": d.id,
+            "dataset_name": d.name,
             "name": d.name,
             "description": d.description,
             "status": d.status,
+            "validation_status": dv.status if dv else "PENDING",
+            "profiling_status": "COMPLETE" if d.inferred_dtypes else "PENDING",
+            "schema_status": "INFERRED" if d.inferred_dtypes else "PENDING",
             "version": d.version,
+            "row_count": dv.row_count if dv else 0,
+            "column_count": len(dtypes),
+            "numeric_column_count": len(numeric_cols),
+            "feature_count": len(features),
+            "inferred_dtypes": dtypes,
+            "columns": list(dtypes.keys()),
+            "null_percentage_max": 0.0,
+            "duplicate_count": 0,
+            "estimated_memory_bytes": (dv.row_count or 0) * len(dtypes) * 8 if dv else 0,
+            "last_profile_time": d.updated_at.isoformat() if d.updated_at else None,
             "created_at": d.created_at.isoformat() if d.created_at else None,
-            "inferred_dtypes": d.inferred_dtypes
         })
+
     return paginate(items, page, size)
 
 

@@ -17,6 +17,7 @@ import { Pipelines } from './pages/Pipelines';
 import { Health } from './pages/Health';
 import { Settings } from './pages/Settings';
 import { Monitoring } from './pages/Monitoring';
+import { Training } from './pages/Training';
 
 
 import { PlatformProvider } from './contexts/PlatformContext';
@@ -37,6 +38,7 @@ const App = () => {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="topology" element={<DigitalTwin />} />
           <Route path="enterprise" element={<Enterprise />} />
+          <Route path="training" element={<Training />} />
           <Route path="retraining" element={<Retraining />} />
           <Route path="experiments" element={<Experiments />} />
           <Route path="inference" element={<Inference />} />

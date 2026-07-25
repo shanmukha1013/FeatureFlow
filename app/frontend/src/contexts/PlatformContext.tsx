@@ -42,8 +42,9 @@ export const PlatformProvider = ({ children }: { children: ReactNode }) => {
       setLoadingStep(3); // Loading Models
       try {
         const modelsRes = await apiClient.get('/management/models');
-        setModels(modelsRes.data.models || []);
+        setModels(modelsRes.data.items || []);
       } catch (e) {
+
         setModels([]);
       }
 

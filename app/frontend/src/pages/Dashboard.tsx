@@ -1,16 +1,15 @@
+import React from 'react';
 import { usePlatform } from '../contexts/PlatformContext';
 import { MetricCard } from '../components/MetricCard';
 import { PageHeader } from '../components/PageHeader';
-import { ErrorState } from '../components/States';
 import { EventStream } from '../components/EventStream';
-import { Zap, Database, Box, TrendingUp } from 'lucide-react';
+import { Zap, Database, Box, TrendingUp, Cpu, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const Dashboard = () => {
   const { stats } = usePlatform();
   const navigate = useNavigate();
 
-  if (!stats) return <ErrorState message="Failed to load platform data." />;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -34,26 +33,22 @@ export const Dashboard = () => {
                 <Zap className="w-5 h-5 mr-2 text-yellow-400" />
                 Quick Actions
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button 
-                onClick={() => navigate('/platform/datasets')}
-                className="flex items-center justify-between p-4 bg-[#252525] hover:bg-[#2d2d2d] rounded-lg border border-gray-800 transition-colors"
-                >
-                <div className="flex items-center">
-                    <Database className="w-5 h-5 text-blue-400 mr-3" />
-                    <span className="text-gray-200 font-medium">Register Dataset</span>
-                </div>
-                <TrendingUp className="w-4 h-4 text-gray-500" />
+            <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => navigate('/platform/datasets')} className="flex items-center gap-3 p-4 bg-[#252525] hover:bg-[#2d2d2d] rounded-lg border border-gray-800 transition-colors">
+                  <Database className="w-5 h-5 text-blue-400" />
+                  <span className="text-gray-200 font-medium text-sm">Upload Dataset</span>
                 </button>
-                <button 
-                onClick={() => navigate('/platform/models')}
-                className="flex items-center justify-between p-4 bg-[#252525] hover:bg-[#2d2d2d] rounded-lg border border-gray-800 transition-colors"
-                >
-                <div className="flex items-center">
-                    <Box className="w-5 h-5 text-emerald-400 mr-3" />
-                    <span className="text-gray-200 font-medium">Deploy Model</span>
-                </div>
-                <TrendingUp className="w-4 h-4 text-gray-500" />
+                <button onClick={() => navigate('/platform/training')} className="flex items-center gap-3 p-4 bg-[#252525] hover:bg-[#2d2d2d] rounded-lg border border-gray-800 transition-colors">
+                  <Cpu className="w-5 h-5 text-purple-400" />
+                  <span className="text-gray-200 font-medium text-sm">Train Model</span>
+                </button>
+                <button onClick={() => navigate('/platform/inference')} className="flex items-center gap-3 p-4 bg-[#252525] hover:bg-[#2d2d2d] rounded-lg border border-gray-800 transition-colors">
+                  <Box className="w-5 h-5 text-emerald-400" />
+                  <span className="text-gray-200 font-medium text-sm">Run Inference</span>
+                </button>
+                <button onClick={() => navigate('/platform/monitoring')} className="flex items-center gap-3 p-4 bg-[#252525] hover:bg-[#2d2d2d] rounded-lg border border-gray-800 transition-colors">
+                  <BarChart3 className="w-5 h-5 text-orange-400" />
+                  <span className="text-gray-200 font-medium text-sm">View Metrics</span>
                 </button>
             </div>
             </div>

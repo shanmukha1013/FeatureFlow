@@ -3,6 +3,7 @@ Assembles all management endpoints under a secured router.
 """
 from fastapi import APIRouter
 from .endpoints import overview_router, registries_router, pipelines_router, observability_router
+from .endpoints.datasets import router as datasets_router
 from .endpoints.retraining import router as retraining_router
 from .endpoints.enterprise import router as enterprise_router
 
@@ -12,6 +13,7 @@ management_router = APIRouter(
 )
 
 management_router.include_router(overview_router)
+management_router.include_router(datasets_router)
 management_router.include_router(registries_router, prefix="/registries")
 management_router.include_router(registries_router)  # backward compatibility for /management/datasets
 management_router.include_router(pipelines_router, prefix="/pipelines")

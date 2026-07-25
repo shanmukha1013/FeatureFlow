@@ -1,46 +1,76 @@
-import React, { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Database, Activity, Box, Cpu, FileJson, PlaySquare, Settings, HeartPulse, Shield, GitMerge, PlayCircle } from 'lucide-react';
-import { usePlatform } from '../contexts/PlatformContext';
+import React from 'react';
+import { NavLink, Outlet } from 'react-router-dom';
+import { 
+  LayoutDashboard, Database, Activity, Box, Cpu, FileJson, 
+  Settings, HeartPulse, Shield, GitMerge, PlayCircle, 
+  Network, FlaskConical, Eye, TrendingDown, ClipboardList,
+  GitBranch, BarChart3
+} from 'lucide-react';
+
+const NAVIGATION = [
+  // Operations
+  { section: 'Operations', items: [
+    { name: 'Command Center', path: '/platform/dashboard', icon: LayoutDashboard },
+    { name: 'Digital Twin', path: '/platform/topology', icon: Network },
+    { name: 'Pipelines', path: '/platform/pipelines', icon: GitBranch },
+    { name: 'Monitoring', path: '/platform/monitoring', icon: BarChart3 },
+    { name: 'Audit Logs', path: '/platform/audit', icon: ClipboardList },
+  ]},
+  // ML Lifecycle
+  { section: 'ML Lifecycle', items: [
+    { name: 'Datasets', path: '/platform/datasets', icon: Database },
+    { name: 'Training', path: '/platform/training', icon: Cpu },
+    { name: 'Experiments', path: '/platform/experiments', icon: FlaskConical },
+    { name: 'Models', path: '/platform/models', icon: Box },
+    { name: 'Retraining', path: '/platform/retraining', icon: GitMerge },
+  ]},
+  // Serving & AI
+  { section: 'Serving & AI', items: [
+    { name: 'Inference', path: '/platform/inference', icon: PlayCircle },
+    { name: 'Features', path: '/platform/features', icon: FileJson },
+    { name: 'Explainability', path: '/platform/explainability', icon: Eye },
+    { name: 'Drift Monitor', path: '/platform/drift', icon: TrendingDown },
+  ]},
+  // Platform
+  { section: 'Platform', items: [
+    { name: 'Enterprise MLOps', path: '/platform/enterprise', icon: Shield },
+    { name: 'Health', path: '/platform/health', icon: HeartPulse },
+    { name: 'Settings', path: '/platform/settings', icon: Settings },
+  ]},
+];
 
 export const Sidebar = () => {
-  const NAVIGATION = [
-    { name: 'Dashboard', path: '/platform/dashboard', icon: LayoutDashboard },
-    { name: 'Digital Twin', path: '/platform/topology', icon: Activity },
-    { name: 'Enterprise MLOps', path: '/platform/enterprise', icon: Shield },
-    { name: 'Retraining', path: '/platform/retraining', icon: GitMerge },
-    { name: 'Experiments', path: '/platform/experiments', icon: Activity },
-    { name: 'Inference', path: '/platform/inference', icon: PlayCircle },
-    { name: 'Explainability', path: '/platform/explainability', icon: Activity },
-    { name: 'Drift Monitor', path: '/platform/drift', icon: Activity },
-    { name: 'Models', path: '/platform/models', icon: Box },
-    { name: 'Datasets', path: '/platform/datasets', icon: Database },
-    { name: 'Features', path: '/platform/features', icon: FileJson },
-    { name: 'Pipelines', path: '/platform/pipelines', icon: Cpu },
-    { name: 'Monitoring', path: '/platform/monitoring', icon: Activity },
-    { name: 'Audit Logs', path: '/platform/audit', icon: Activity },
-    { name: 'Health', path: '/platform/health', icon: HeartPulse },
-    { name: 'Settings', path: '/platform/settings', icon: Settings }
-  ];
-
   return (
-    <div className="w-64 h-screen bg-[#111111] border-r border-border flex flex-col shrink-0">
-      <div className="h-16 flex items-center px-6 border-b border-border">
-        <span className="text-lg font-bold text-white tracking-tight">FeatureFlow</span>
+    <div className="w-60 h-screen bg-[#0d0d0d] border-r border-[#1f1f1f] flex flex-col shrink-0">
+      <div className="h-14 flex items-center px-5 border-b border-[#1f1f1f]">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center">
+            <Activity size={12} className="text-white" />
+          </div>
+          <span className="text-sm font-bold text-white tracking-tight">FeatureFlow</span>
+        </div>
       </div>
-      <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
-        {NAVIGATION.map((link) => (
-          <NavLink 
-            key={link.path} 
-            to={link.path}
-            className={({isActive}) => `
-              flex items-center gap-3 px-3 py-2 rounded-md font-medium text-sm transition-colors
-              ${isActive ? 'bg-[#262626] text-white' : 'text-muted hover:text-white hover:bg-[#1f1f1f]'}
-            `}
-          >
-            <link.icon size={16} />
-            {link.name}
-          </NavLink>
+      <nav className="flex-1 py-4 overflow-y-auto scrollbar-none">
+        {NAVIGATION.map((section) => (
+          <div key={section.section} className="mb-4">
+            <p className="px-4 mb-1 text-[10px] font-semibold text-gray-600 uppercase tracking-widest">{section.section}</p>
+            {section.items.map((link) => (
+              <NavLink
+                key={link.path}
+                to={link.path}
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-4 py-2 text-sm transition-colors ${
+                    isActive
+                      ? 'text-white bg-[#1a1a1a] border-r-2 border-indigo-500'
+                      : 'text-gray-500 hover:text-gray-200 hover:bg-[#161616]'
+                  }`
+                }
+              >
+                <link.icon size={14} />
+                {link.name}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
     </div>
@@ -48,25 +78,19 @@ export const Sidebar = () => {
 };
 
 export const AppLayout = () => {
-
   return (
-    <div className="flex h-screen bg-background overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#0a0a0a] overflow-hidden font-sans">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-background border-b border-border flex items-center px-8 shrink-0 justify-between">
+        <header className="h-14 bg-[#0d0d0d] border-b border-[#1f1f1f] flex items-center px-8 shrink-0 justify-between">
           <div className="flex items-center gap-4">
-            <div className="text-sm text-muted">Platform Management</div>
-            <div className="flex items-center gap-2 text-xs font-medium text-success bg-success/10 px-2.5 py-1 rounded border border-success/20">
-              <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
+            <div className="text-xs text-gray-500">FeatureFlow MLOps Platform</div>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               Online
             </div>
           </div>
-          
-          <div className="relative">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-400">
-               <div className="text-sm font-medium leading-none">Single-User Mode</div>
-            </div>
-          </div>
+          <div className="text-[10px] text-gray-700 font-mono">v1.0.0</div>
         </header>
         <main className="flex-1 overflow-y-auto p-8 bg-[#0a0a0a]">
           <div className="max-w-6xl mx-auto">

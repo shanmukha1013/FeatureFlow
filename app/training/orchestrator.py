@@ -78,25 +78,80 @@ class TrainingOrchestrator:
 
             features = await self._get_features_for_dataset(session, dataset_record.id)
 
-            if not features:
-                logger.warning(f"No engineered features found for dataset {dataset_name}. Skipping training.")
-                return
+            # Build training DataFrame:
+            # If we have features with 'passthrough' transformation (created during upload),
+            # we can use those columns directly from df_raw.
+            # Otherwise, run through the feature transformer.
+            passthrough_features = [f for f in features if f.transformation == 'passthrough']
+            engineered_features = [f for f in features if f.transformation != 'passthrough']
 
-            logger.info(f"Transforming {len(features)} features for training.")
-            df_features = self.feature_transformer.transform(df_raw, features)
+            if passthrough_features:
+                # Use raw column values directly — filter to numeric-compatible columns
+                # and exclude the target column
+                usable_cols = []
+                for f in passthrough_features:
+                    col = f.name
+                    if col == target_col:
+                        continue
+                    if col not in df_raw.columns:
+                        continue
+                    # Only use columns that can be coerced to numeric
+                    try:
+                        pd.to_numeric(df_raw[col], errors='raise')
+                        usable_cols.append(col)
+                    except Exception:
+                        # Try label encoding for low-cardinality object columns
+                        if df_raw[col].nunique() < 50:
+                            usable_cols.append(col)
+
+                if not usable_cols:
+                    # Fall back to all numeric columns in the raw df
+                    usable_cols = [c for c in df_raw.select_dtypes(include=['number']).columns if c != target_col]
+
+                if not usable_cols:
+                    logger.warning(f"No usable feature columns for dataset {dataset_name}. Skipping training.")
+                    return
+
+                df_features = df_raw[usable_cols].copy()
+                # Label encode any object columns
+                from sklearn.preprocessing import LabelEncoder
+                for col in df_features.columns:
+                    if df_features[col].dtype == object:
+                        df_features[col] = LabelEncoder().fit_transform(df_features[col].astype(str))
+                # Fill NaN with column median for numeric cols
+                df_features = df_features.fillna(df_features.median(numeric_only=True))
+
+                feature_names = usable_cols
+
+            elif engineered_features:
+                logger.info(f"Transforming {len(engineered_features)} engineered features for training.")
+                df_features = self.feature_transformer.transform(df_raw, engineered_features)
+                feature_names = [f.name for f in engineered_features]
+            else:
+                # No features at all — use all numeric columns directly
+                logger.warning(f"No features registered for dataset {dataset_name}. Using all numeric columns.")
+                usable_cols = [c for c in df_raw.select_dtypes(include=['number']).columns if c != target_col]
+                if not usable_cols:
+                    logger.warning("No numeric columns found. Skipping training.")
+                    return
+                df_features = df_raw[usable_cols].copy().fillna(0)
+                feature_names = usable_cols
 
             df_features[target_col] = df_raw[target_col]
             df_features.dropna(subset=[target_col], inplace=True)
+
+            if len(df_features) < 10:
+                logger.warning(f"Dataset {dataset_name} has too few rows after processing ({len(df_features)}). Skipping training.")
+                return
 
             if df_features[target_col].nunique() > 10:
                 logger.info(f"Target column '{target_col}' has {df_features[target_col].nunique()} unique values. Discretizing to top 5 categories + 'Other' for classification stability.")
                 top_classes = set(df_features[target_col].value_counts().nlargest(5).index)
                 df_features[target_col] = df_features[target_col].apply(lambda x: x if x in top_classes else 'Other')
 
-            from sklearn.preprocessing import LabelEncoder
-            df_features[target_col] = LabelEncoder().fit_transform(df_features[target_col].astype(str))
+            from sklearn.preprocessing import LabelEncoder as LE2
+            df_features[target_col] = LE2().fit_transform(df_features[target_col].astype(str))
 
-            feature_names = [f.name for f in features]
             X, y = self.dataset_builder.prepare(df_features, feature_names, target_col)
 
             X_train, X_test, y_train, y_test = self.splitter.split(X, y)
