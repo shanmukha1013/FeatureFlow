@@ -16,6 +16,83 @@ from app.config import settings
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+@router.get("/setup-status")
+async def get_setup_status(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).join(Role).filter(Role.name == "ADMIN"))
+    admin = result.scalars().first()
+    return {"setup_required": admin is None}
+
+
+@router.post("/setup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def setup_admin(request: RegisterRequest, req: Request, db: AsyncSession = Depends(get_db)):
+    if not validate_password_strength(request.password):
+        raise HTTPException(status_code=400, detail="Password does not meet enterprise strength requirements")
+
+    # Check if admin already exists
+    result = await db.execute(select(User).join(Role).filter(Role.name == "ADMIN"))
+    if result.scalars().first():
+        raise HTTPException(status_code=403, detail="Setup already complete. Admin exists.")
+
+    result = await db.execute(select(User).filter((User.username == request.username) | (User.email == request.email)))
+    existing_user = result.scalars().first()
+    if existing_user:
+        raise HTTPException(status_code=409, detail="Username or email already exists")
+
+    hashed_password = get_password_hash(request.password)
+    role_res = await db.execute(select(Role).filter(Role.name == "ADMIN"))
+    admin_role = role_res.scalars().first()
+    if not admin_role:
+        raise HTTPException(status_code=500, detail="ADMIN role not found. Database not initialized correctly.")
+
+    user = User(
+        username=request.username,
+        email=request.email,
+        hashed_password=hashed_password,
+        role_id=admin_role.id,
+        status="ACTIVE"
+    )
+    db.add(user)
+    await db.flush()
+
+    pwd_history = PasswordHistory(user_id=user.id, hashed_password=hashed_password)
+    db.add(pwd_history)
+
+    await AuditLogger.record(db, AuditEvent(
+        event_name="ADMIN_SETUP_COMPLETED", component="AuthAPI", severity="INFO",
+        payload={"username": user.username, "email": user.email}
+    ))
+    await db.commit()
+    await db.refresh(user)
+
+    # Automatically log them in
+    session_id = str(uuid.uuid4())
+    access_token = create_access_token(user.id, user.username)
+    refresh_token = create_refresh_token(user.id, session_id)
+
+    client_ip = req.headers.get("X-Forwarded-For", req.client.host if req.client else None)
+    device = req.headers.get("User-Agent")
+
+    import datetime as dt
+    expires_at = datetime.now(timezone.utc) + dt.timedelta(days=settings.refresh_token_expire_days)
+
+    user_session = UserSession(
+        user_id=user.id,
+        session_id=session_id,
+        refresh_token=refresh_token,
+        device=device,
+        ip_address=client_ip,
+        expires_at=expires_at
+    )
+    db.add(user_session)
+    await db.commit()
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.access_token_expire_minutes * 60
+    )
+
+
 @router.post("/register", response_model=UserProfile, status_code=status.HTTP_201_CREATED)
 async def register(request: RegisterRequest, req: Request, db: AsyncSession = Depends(get_db)):
     if not validate_password_strength(request.password):
@@ -34,12 +111,12 @@ async def register(request: RegisterRequest, req: Request, db: AsyncSession = De
         username=request.username,
         email=request.email,
         hashed_password=hashed_password,
-        role_id=viewer_role.id if viewer_role else None
+        role_id=viewer_role.id if viewer_role else None,
+        status="ACTIVE"
     )
     db.add(user)
     await db.flush()
 
-    # Track password history
     pwd_history = PasswordHistory(user_id=user.id, hashed_password=hashed_password)
     db.add(pwd_history)
 

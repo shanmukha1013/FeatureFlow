@@ -22,6 +22,23 @@ export const Login = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  // Check if first-run setup is required
+  useEffect(() => {
+    const checkSetup = async () => {
+      try {
+        const { setup_required } = await authService.getSetupStatus();
+        if (setup_required) {
+          navigate('/setup', { replace: true });
+        }
+      } catch (e) {
+        // Ignore
+      }
+    };
+    if (!isAuthenticated) {
+      checkSetup();
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -99,9 +116,9 @@ export const Login = () => {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between ml-1">
                 <label className="text-sm font-medium text-neutral-300">Password</label>
-                <a href="#forgot" onClick={(e) => e.preventDefault()} className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
+                <span title="Contact your system administrator" className="text-sm font-medium text-neutral-500 cursor-help">
                   Forgot Password?
-                </a>
+                </span>
               </div>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-neutral-500 group-focus-within:text-indigo-400 transition-colors">

@@ -115,16 +115,20 @@ async def init_db():
                 session.add(RolePermission(role_id=admin_role.id, permission_id=admin_perm.id))
 
                 # Admin user
-                admin_user = User(
-                    username="admin",
-                    email=settings.default_admin_email,
-                    hashed_password=get_password_hash(settings.default_admin_password),
-                    role_id=admin_role.id,
-                    status="ACTIVE"
-                )
-                session.add(admin_user)
-                await session.commit()
-                logger.info("Seeded default roles and admin user.")
+                if settings.default_admin_password:
+                    admin_user = User(
+                        username="admin",
+                        email=settings.default_admin_email or "admin@featureflow.local",
+                        hashed_password=get_password_hash(settings.default_admin_password),
+                        role_id=admin_role.id,
+                        status="ACTIVE"
+                    )
+                    session.add(admin_user)
+                    await session.commit()
+                    logger.info("Seeded default roles and admin user.")
+                else:
+                    await session.commit()
+                    logger.info("Seeded default roles. Setup required to create first admin.")
 
     except Exception as e:
         logger.exception(f"Database connection or table creation failed: {e}")

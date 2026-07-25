@@ -2,6 +2,16 @@ import { apiClient } from '../api/client';
 import { UserProfile, TokenResponse } from './authTypes';
 
 export const authService = {
+  getSetupStatus: async (): Promise<{ setup_required: boolean }> => {
+    const response = await apiClient.get('/auth/setup-status');
+    return response.data;
+  },
+
+  setupAdmin: async (username: string, email: string, password: string): Promise<TokenResponse> => {
+    const response = await apiClient.post('/auth/setup', { username, email, password });
+    return response.data;
+  },
+
   login: async (username: string, password: string):Promise<TokenResponse> => {
     const response = await apiClient.post('/auth/login', { username, password });
     return response.data;

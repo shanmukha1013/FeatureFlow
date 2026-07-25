@@ -21,6 +21,7 @@ import { Landing } from './pages/Landing';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { Login } from './pages/Login';
+import { Setup } from './pages/Setup';
 import { PlatformProvider } from './contexts/PlatformContext';
 
 const App = () => {
@@ -29,6 +30,7 @@ const App = () => {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/setup" element={<Setup />} />
         
         <Route path="/platform" element={
           <ProtectedRoute>
