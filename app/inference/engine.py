@@ -52,16 +52,17 @@ class PredictionEngine:
 
         champion_meta = None
 
-        # Requirement 3 & Phase 4 Requirement 9: Synchronize Redis Model & Prediction Caches on startup
+        # Requirement 3 & Phase 4 Requirement 9: Synchronize Redis Model & Prediction Caches
+        # NOTE: Eager cache warming has been disabled to reduce startup memory spikes 
+        # on Render Free Tier (512MB RAM). Caches will populate lazily on first request.
         try:
             from app.cache.model_cache import get_model_registry_cache
             from app.cache.prediction_cache import get_prediction_cache
-            model_cache = await get_model_registry_cache()
-            await model_cache.refresh_all_caches()
-            prediction_cache = await get_prediction_cache()
-            await prediction_cache.warm_cache()
+            # Pre-initialize cache singletons but do not load all data eagerly
+            await get_model_registry_cache()
+            await get_prediction_cache()
         except Exception as cache_e:
-            logger.warning(f"Could not warm up Redis cache layers on startup: {cache_e}")
+            logger.warning(f"Could not initialize Redis cache layers on startup: {cache_e}")
 
         async with AsyncSessionLocal() as session:
             champion_repo = ChampionModelRepository(session)
@@ -140,6 +141,10 @@ class PredictionEngine:
 
     async def _execute_predict(self, request: PredictionRequest, alias: str = "default") -> PredictionResponse:
         """Core prediction logic with fallback mechanism."""
+        # Lazy load models into memory on first request
+        if not self.predictors:
+            await self.start()
+
         try:
             from app.inference.routing import global_traffic_router
 

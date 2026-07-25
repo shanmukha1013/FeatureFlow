@@ -1,4 +1,3 @@
-import shap
 from typing import Any, Tuple
 
 
@@ -7,6 +6,7 @@ def get_explainer_for_model(model: Any) -> Tuple[Any, str]:
     Dynamically inspects a loaded ML model object and returns the appropriate SHAP Explainer class.
     Also returns a string identifier of the explainer type.
     """
+    import shap
     model_type = type(model).__name__
 
     # Tree Models

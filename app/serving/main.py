@@ -90,8 +90,8 @@ async def lifespan(app: FastAPI):
 
     await validate_startup()
 
-    # Start Prediction Engine immediately to warm caches
-    await _prediction_engine.start()
+    # Note: ML Model loading (_prediction_engine.start) has been removed from startup.
+    # Models will be lazily loaded on the first prediction request to save memory.
 
     # Phase 5: Start Redis enterprise background services
     health_monitor = await get_health_monitor()
@@ -113,10 +113,6 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
-    def run_discovery():
-        discovery = DatasetDiscovery()
-        discovery.discover_datasets()
-
     import sys
     import os
     from app.config import settings
@@ -124,8 +120,10 @@ async def lifespan(app: FastAPI):
     # Phase 12: Start system metrics collection in background
     metrics_task = asyncio.create_task(collect_system_metrics())
 
-    if "pytest" not in sys.modules and not os.getenv("PYTEST_CURRENT_TEST") and settings.environment.lower() != "test":
-        threading.Thread(target=run_discovery, daemon=True).start()
+    # Note: Dataset discovery (run_discovery) has been removed from startup 
+    # to dramatically reduce memory footprint on Render Free tier (512MB RAM).
+    # Heavy tasks like profiling should be triggered via API, not on boot.
+
     yield
     # Stop background tasks
     metrics_task.cancel()
