@@ -17,7 +17,7 @@ v1_router.include_router(api_keys.router, dependencies=protected)
 v1_router.include_router(admin_security.router, dependencies=protected)
 
 v1_router.include_router(predict.router, tags=["predict"], dependencies=protected)
-v1_router.include_router(health.router, tags=["health"], dependencies=protected)
+v1_router.include_router(health.router, tags=["health"]) # Unprotected for Render probes
 v1_router.include_router(models.router, tags=["models"], dependencies=protected)
 v1_router.include_router(version.router, tags=["version"], dependencies=protected)
 v1_router.include_router(features.router, tags=["features"], dependencies=protected)
