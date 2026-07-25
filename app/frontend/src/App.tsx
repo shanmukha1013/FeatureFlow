@@ -19,6 +19,7 @@ import { Monitoring } from './pages/Monitoring';
 
 
 import { PlatformProvider } from './contexts/PlatformContext';
+import { WebSocketProvider } from './contexts/WebSocketContext';
 
 const App = () => {
   return (
@@ -27,7 +28,9 @@ const App = () => {
         <Route path="/" element={<Navigate to="/platform/dashboard" replace />} />
         <Route path="/platform" element={
             <PlatformProvider>
-              <AppLayout />
+              <WebSocketProvider>
+                <AppLayout />
+              </WebSocketProvider>
             </PlatformProvider>
         }>
           <Route path="dashboard" element={<Dashboard />} />

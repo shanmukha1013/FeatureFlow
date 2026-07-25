@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.events import get_event_bus
+from app.events.schema import Event, EventType, EventSeverity
 
 
 from app.storage.database import get_db
@@ -29,6 +31,21 @@ async def run_training(
             hyperparameters=request.hyperparameters or {},
             target_column=request.target_column or "target"
         )
+
+        # Emit event
+        bus = get_event_bus()
+        if bus:
+            await bus.publish(Event(
+                type=EventType.JOB_COMPLETED,
+                source="mlflow.training",
+                payload={
+                    "run_id": experiment.mlflow_run_id,
+                    "experiment_id": experiment.mlflow_experiment_id,
+                    "algorithm": request.algorithm,
+                    "dataset_id": request.dataset_id
+                }
+            ))
+
         return MLflowTrainResponse(
             run_id=experiment.mlflow_run_id or "",
             experiment_id=experiment.mlflow_experiment_id or "",
@@ -91,6 +108,21 @@ async def promote_model(
             version=request.version,
             alias=request.alias
         )
+
+        # Emit event
+        bus = get_event_bus()
+        if bus:
+            await bus.publish(Event(
+                type=EventType.MODEL_PROMOTED,
+                source="mlflow.promotion",
+                payload={
+                    "model_name": request.model_name,
+                    "version": request.version,
+                    "alias": request.alias
+                },
+                severity=EventSeverity.INFO
+            ))
+
         return MLflowPromoteResponse(
             model_name=request.model_name,
             version=request.version,

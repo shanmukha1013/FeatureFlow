@@ -23,6 +23,8 @@ async def lifespan(app: FastAPI):
     from app.storage.database import init_db
     from app.cache import RedisClient
     from app.cache.health_monitor import get_health_monitor
+    from app.events.bus import EventBus
+    from app.events import set_event_bus
     from app.cache.recovery_manager import get_recovery_manager
     from app.monitoring.audit import AuditLogger, AuditEvent
     from app.storage.database import AsyncSessionLocal
@@ -84,11 +86,24 @@ async def lifespan(app: FastAPI):
     await validate_startup()
 
     # Note: ML Model loading (_prediction_engine.start) has been removed from startup.
-    # Models will be lazily loaded on the first prediction request to save memory.
-
-    # Phase 5: Start Redis enterprise background services
-    health_monitor = await get_health_monitor()
-    await health_monitor.start()
+    # Phase 5: Initialize Redis Subsystem
+    # In V3, Redis also powers our core EventBus
+    try:
+        redis_client = RedisClient()
+        await redis_client.connect()
+        app.state.redis = redis_client
+        
+        # Initialize EventBus
+        event_bus = EventBus(redis_client)
+        set_event_bus(event_bus)
+        await event_bus.start()
+        
+        health_monitor = get_health_monitor(redis_client)
+        await health_monitor.start()
+    except Exception as e:
+        import sys
+        print(f"CRITICAL: Failed to initialize Redis subsystem: {e}", file=sys.stderr)
+        sys.exit(1)
 
     recovery_manager = await get_recovery_manager()
     await recovery_manager.start()
@@ -117,6 +132,12 @@ async def lifespan(app: FastAPI):
     # Stop background tasks
     metrics_task.cancel()
     # Phase 5: Stop background services gracefully
+    from app.events import get_event_bus
+    
+    event_bus = get_event_bus()
+    if event_bus:
+        await event_bus.stop()
+        
     await health_monitor.stop()
     await recovery_manager.stop()
 
@@ -181,6 +202,9 @@ FeatureFlow is a production-grade ML platform for feature management, real-time 
     from app.serving.api.v1.endpoints import health, model_cache
     app.include_router(health.router, tags=["health"])
     app.include_router(model_cache.router, tags=["model_cache"])
+
+    from app.serving.websockets import router as websockets_router
+    app.include_router(websockets_router)
 
     # Register metrics endpoint
     from prometheus_client import generate_latest, CONTENT_TYPE_LATEST

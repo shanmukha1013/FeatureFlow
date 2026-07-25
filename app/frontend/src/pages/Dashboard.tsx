@@ -2,9 +2,13 @@ import { usePlatform } from '../contexts/PlatformContext';
 import { MetricCard } from '../components/MetricCard';
 import { PageHeader } from '../components/PageHeader';
 import { ErrorState } from '../components/States';
+import { EventStream } from '../components/EventStream';
+import { Zap, Database, Box, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export const Dashboard = () => {
   const { stats } = usePlatform();
+  const navigate = useNavigate();
 
   if (!stats) return <ErrorState message="Failed to load platform data." />;
 
@@ -21,6 +25,43 @@ export const Dashboard = () => {
         <MetricCard title="Feature Pipeline Runs" value={stats?.pipeline_count || 0} />
         <MetricCard title="Registered Features" value={stats?.registered_features || 0} />
         <MetricCard title="Registered Datasets" value={stats?.registered_datasets || 0} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+            <div className="bg-[#1e1e1e] p-6 rounded-lg border border-gray-800">
+            <h2 className="text-lg font-semibold text-gray-200 mb-4 flex items-center">
+                <Zap className="w-5 h-5 mr-2 text-yellow-400" />
+                Quick Actions
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button 
+                onClick={() => navigate('/platform/datasets')}
+                className="flex items-center justify-between p-4 bg-[#252525] hover:bg-[#2d2d2d] rounded-lg border border-gray-800 transition-colors"
+                >
+                <div className="flex items-center">
+                    <Database className="w-5 h-5 text-blue-400 mr-3" />
+                    <span className="text-gray-200 font-medium">Register Dataset</span>
+                </div>
+                <TrendingUp className="w-4 h-4 text-gray-500" />
+                </button>
+                <button 
+                onClick={() => navigate('/platform/models')}
+                className="flex items-center justify-between p-4 bg-[#252525] hover:bg-[#2d2d2d] rounded-lg border border-gray-800 transition-colors"
+                >
+                <div className="flex items-center">
+                    <Box className="w-5 h-5 text-emerald-400 mr-3" />
+                    <span className="text-gray-200 font-medium">Deploy Model</span>
+                </div>
+                <TrendingUp className="w-4 h-4 text-gray-500" />
+                </button>
+            </div>
+            </div>
+        </div>
+
+        <div className="lg:col-span-1 h-[400px]">
+            <EventStream />
+        </div>
       </div>
 
       <div className="bg-surface rounded-lg p-8 border border-border h-64 flex items-center justify-center">

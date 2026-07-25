@@ -13,6 +13,8 @@ from app.data_quality.suites import ExpectationSuiteEngine
 from app.data_quality.validator import GXEphemeralValidator
 from app.data_quality.gates import QualityGate
 from app.data_quality.repositories import ValidationRunRepository, ExpectationResultRepository
+from app.events import get_event_bus
+from app.events.schema import Event, EventType, EventSeverity
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -112,6 +114,22 @@ class DataQualityService:
         await self.result_repo.create_bulk(db_results)
 
         logger.info(f"Data Quality validation completed. Health Score: {health_score:.1f}. Halting: {should_halt}")
+
+        # Emit Event
+        bus = get_event_bus()
+        if bus:
+            await bus.publish(Event(
+                type=EventType.DATASET_FAILED if should_halt else EventType.DATASET_VALIDATED,
+                source="data_quality.validator",
+                severity=EventSeverity.ERROR if should_halt else EventSeverity.INFO,
+                payload={
+                    "dataset_name": dataset_name,
+                    "dataset_version_id": dataset_version.id,
+                    "health_score": health_score,
+                    "success": validation_results.success,
+                    "should_halt": should_halt
+                }
+            ))
 
         # 7. Update Cache
         try:
