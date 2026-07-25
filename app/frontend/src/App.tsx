@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './layouts/AppLayout';
 import { Dashboard } from './pages/Dashboard';
+import { DigitalTwin } from './pages/DigitalTwin';
 import { Inference } from './pages/Inference';
 import { Models } from './pages/Models';
 import { AuditLogs } from './pages/AuditLogs';
@@ -34,6 +35,7 @@ const App = () => {
             </PlatformProvider>
         }>
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="topology" element={<DigitalTwin />} />
           <Route path="enterprise" element={<Enterprise />} />
           <Route path="retraining" element={<Retraining />} />
           <Route path="experiments" element={<Experiments />} />

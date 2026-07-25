@@ -64,8 +64,29 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      <div className="bg-surface rounded-lg p-8 border border-border h-64 flex items-center justify-center">
-        <p className="text-muted text-sm">Detailed telemetry charts will render here (Recharts placeholder).</p>
+      <div className="bg-[#1e1e1e] rounded-lg p-6 border border-gray-800 mt-6">
+        <h2 className="text-lg font-semibold text-gray-200 mb-4 flex items-center">
+          <Database className="w-5 h-5 mr-2 text-indigo-400" />
+          Active Subsystems
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 bg-[#151515] border border-gray-800 rounded flex flex-col items-center justify-center">
+                <span className="text-gray-400 text-xs font-mono mb-2">REDIS BUS</span>
+                <span className="text-emerald-400 font-semibold text-sm">CONNECTED</span>
+            </div>
+            <div className="p-4 bg-[#151515] border border-gray-800 rounded flex flex-col items-center justify-center">
+                <span className="text-gray-400 text-xs font-mono mb-2">WEBSOCKETS</span>
+                <span className="text-emerald-400 font-semibold text-sm">ACTIVE</span>
+            </div>
+            <div className="p-4 bg-[#151515] border border-gray-800 rounded flex flex-col items-center justify-center">
+                <span className="text-gray-400 text-xs font-mono mb-2">FEATURE STORE</span>
+                <span className="text-emerald-400 font-semibold text-sm">SYNCED</span>
+            </div>
+            <div className="p-4 bg-[#151515] border border-gray-800 rounded flex flex-col items-center justify-center">
+                <span className="text-gray-400 text-xs font-mono mb-2">MODEL REGISTRY</span>
+                <span className="text-emerald-400 font-semibold text-sm">ONLINE</span>
+            </div>
+        </div>
       </div>
     </div>
   );

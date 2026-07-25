@@ -1,25 +1,26 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Database, Activity, Box, Cpu, FileJson, PlaySquare, Settings, HeartPulse, Shield } from 'lucide-react';
+import { LayoutDashboard, Database, Activity, Box, Cpu, FileJson, PlaySquare, Settings, HeartPulse, Shield, GitMerge, PlayCircle } from 'lucide-react';
 import { usePlatform } from '../contexts/PlatformContext';
 
 export const Sidebar = () => {
-  const links = [
-    { to: '/platform/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/platform/enterprise', icon: Shield, label: 'Enterprise MLOps' },
-    { to: '/platform/retraining', icon: Activity, label: 'Retraining' },
-    { to: '/platform/experiments', icon: Activity, label: 'Experiments' },
-    { to: '/platform/inference', icon: PlaySquare, label: 'Inference' },
-    { to: '/platform/explainability', icon: Activity, label: 'Explainability' },
-    { to: '/platform/drift', icon: Activity, label: 'Drift Monitor' },
-    { to: '/platform/models', icon: Box, label: 'Models' },
-    { to: '/platform/datasets', icon: Database, label: 'Datasets' },
-    { to: '/platform/features', icon: FileJson, label: 'Features' },
-    { to: '/platform/pipelines', icon: Cpu, label: 'Pipelines' },
-    { to: '/platform/monitoring', icon: Activity, label: 'Monitoring' },
-    { to: '/platform/audit', icon: Activity, label: 'Audit Logs' },
-    { to: '/platform/health', icon: HeartPulse, label: 'Health' },
-    { to: '/platform/settings', icon: Settings, label: 'Settings' }
+  const NAVIGATION = [
+    { name: 'Dashboard', path: '/platform/dashboard', icon: LayoutDashboard },
+    { name: 'Digital Twin', path: '/platform/topology', icon: Activity },
+    { name: 'Enterprise MLOps', path: '/platform/enterprise', icon: Shield },
+    { name: 'Retraining', path: '/platform/retraining', icon: GitMerge },
+    { name: 'Experiments', path: '/platform/experiments', icon: Activity },
+    { name: 'Inference', path: '/platform/inference', icon: PlayCircle },
+    { name: 'Explainability', path: '/platform/explainability', icon: Activity },
+    { name: 'Drift Monitor', path: '/platform/drift', icon: Activity },
+    { name: 'Models', path: '/platform/models', icon: Box },
+    { name: 'Datasets', path: '/platform/datasets', icon: Database },
+    { name: 'Features', path: '/platform/features', icon: FileJson },
+    { name: 'Pipelines', path: '/platform/pipelines', icon: Cpu },
+    { name: 'Monitoring', path: '/platform/monitoring', icon: Activity },
+    { name: 'Audit Logs', path: '/platform/audit', icon: Activity },
+    { name: 'Health', path: '/platform/health', icon: HeartPulse },
+    { name: 'Settings', path: '/platform/settings', icon: Settings }
   ];
 
   return (
@@ -28,17 +29,17 @@ export const Sidebar = () => {
         <span className="text-lg font-bold text-white tracking-tight">FeatureFlow</span>
       </div>
       <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
-        {links.map((link) => (
+        {NAVIGATION.map((link) => (
           <NavLink 
-            key={link.to} 
-            to={link.to}
+            key={link.path} 
+            to={link.path}
             className={({isActive}) => `
               flex items-center gap-3 px-3 py-2 rounded-md font-medium text-sm transition-colors
               ${isActive ? 'bg-[#262626] text-white' : 'text-muted hover:text-white hover:bg-[#1f1f1f]'}
             `}
           >
             <link.icon size={16} />
-            {link.label}
+            {link.name}
           </NavLink>
         ))}
       </nav>
