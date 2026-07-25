@@ -82,70 +82,39 @@ class TrainingOrchestrator:
                 logger.error(f"No raw data found in PostgreSQL for dataset '{dataset_name}'.")
                 return
 
-            df_raw = pd.read_csv(io.BytesIO(dataset_version.raw_data))
+            features = await self._get_features_for_dataset(session, dataset_record.id)
+            if not features:
+                logger.warning(f"No features registered for dataset {dataset_name}. Skipping training to enforce consistency.")
+                return
+
+            import hashlib
+            import json
+            
+            # Compute canonical feature hash for Training-Serving consistency (Lineage)
+            hash_payload = []
+            for f in features:
+                hash_payload.append({
+                    "id": f.id,
+                    "name": f.name,
+                    "transformation": f.transformation,
+                    "state": f.state
+                })
+            
+            hash_str = json.dumps(hash_payload, sort_keys=True)
+            training_feature_hash = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()
+
+            if dataset_version.materialized_data:
+                logger.info(f"Loading materialized Offline Feature Store data for {dataset_name}.")
+                df_features = pd.read_parquet(io.BytesIO(dataset_version.materialized_data))
+                df_raw = pd.read_csv(io.BytesIO(dataset_version.raw_data)) # Needed for target column extraction
+            else:
+                logger.warning(f"Materialized data not found for {dataset_name}. Falling back to on-the-fly transformation.")
+                df_raw = pd.read_csv(io.BytesIO(dataset_version.raw_data))
+                self.feature_transformer.fit(df_raw, features)
+                df_features = self.feature_transformer.transform(df_raw, features)
 
             target_col = self._select_target_column(df_raw, dataset_name)
-
-            features = await self._get_features_for_dataset(session, dataset_record.id)
-
-            # Build training DataFrame:
-            # If we have features with 'passthrough' transformation (created during upload),
-            # we can use those columns directly from df_raw.
-            # Otherwise, run through the feature transformer.
-            passthrough_features = [f for f in features if f.transformation == 'passthrough']
-            engineered_features = [f for f in features if f.transformation != 'passthrough']
-
-            if passthrough_features:
-                # Use raw column values directly — filter to numeric-compatible columns
-                # and exclude the target column
-                usable_cols = []
-                for f in passthrough_features:
-                    col = f.name
-                    if col == target_col:
-                        continue
-                    if col not in df_raw.columns:
-                        continue
-                    # Only use columns that can be coerced to numeric
-                    try:
-                        pd.to_numeric(df_raw[col], errors='raise')
-                        usable_cols.append(col)
-                    except Exception:
-                        # Try label encoding for low-cardinality object columns
-                        if df_raw[col].nunique() < 50:
-                            usable_cols.append(col)
-
-                if not usable_cols:
-                    # Fall back to all numeric columns in the raw df
-                    usable_cols = [c for c in df_raw.select_dtypes(include=['number']).columns if c != target_col]
-
-                if not usable_cols:
-                    logger.warning(f"No usable feature columns for dataset {dataset_name}. Skipping training.")
-                    return
-
-                df_features = df_raw[usable_cols].copy()
-                # Label encode any object columns
-                from sklearn.preprocessing import LabelEncoder
-                for col in df_features.columns:
-                    if df_features[col].dtype == object:
-                        df_features[col] = LabelEncoder().fit_transform(df_features[col].astype(str))
-                # Fill NaN with column median for numeric cols
-                df_features = df_features.fillna(df_features.median(numeric_only=True))
-
-                feature_names = usable_cols
-
-            elif engineered_features:
-                logger.info(f"Transforming {len(engineered_features)} engineered features for training.")
-                df_features = self.feature_transformer.transform(df_raw, engineered_features)
-                feature_names = [f.name for f in engineered_features]
-            else:
-                # No features at all — use all numeric columns directly
-                logger.warning(f"No features registered for dataset {dataset_name}. Using all numeric columns.")
-                usable_cols = [c for c in df_raw.select_dtypes(include=['number']).columns if c != target_col]
-                if not usable_cols:
-                    logger.warning("No numeric columns found. Skipping training.")
-                    return
-                df_features = df_raw[usable_cols].copy().fillna(0)
-                feature_names = usable_cols
+            feature_names = [f.name for f in features]
 
             df_features[target_col] = df_raw[target_col]
             df_features.dropna(subset=[target_col], inplace=True)
@@ -218,6 +187,7 @@ class TrainingOrchestrator:
                     artifact_path, checksum = self.artifact_store.save(ml_model, model_id_str, f"v{version}")
                     if isinstance(metrics, dict):
                         metrics["_checksum"] = checksum
+                        metrics["training_feature_hash"] = training_feature_hash
                     await AuditLogger.record(session, AuditEvent(event_name="ARTIFACT_SAVED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str, "checksum": checksum}))
 
                     # 5. Explainability & Baseline Profiling
@@ -246,6 +216,7 @@ class TrainingOrchestrator:
                             "version": version,
                             "metrics": metrics,
                             "hyperparameters": trainer.hyperparameters,
+                            "feature_lineage": hash_payload,
                             "artifact_uri": artifact_path,
                             "status": "CANDIDATE"
                         })
@@ -256,6 +227,7 @@ class TrainingOrchestrator:
                             "version": version,
                             "metrics": metrics,
                             "hyperparameters": trainer.hyperparameters,
+                            "feature_lineage": hash_payload,
                             "artifact_uri": artifact_path,
                             "status": "CANDIDATE"
                         })

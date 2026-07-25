@@ -159,7 +159,6 @@ async def upload_dataset(
     await session.flush()
 
     # Convert DataFrame back to CSV bytes for storage
-    import io
     csv_buffer = io.BytesIO()
     df.to_csv(csv_buffer, index=False)
     csv_bytes = csv_buffer.getvalue()
@@ -186,28 +185,26 @@ async def upload_dataset(
         session.add(dataset_version)
     await session.flush()
 
-    # Auto-create Feature records for all numeric columns
-    existing_features_res = await session.execute(
-        select(Feature).filter(Feature.dataset_id == dataset_record.id)
-    )
-    existing_feature_names = {f.name for f in existing_features_res.scalars().all()}
-
-    new_features = []
-    for col in df.columns:
-        if col in existing_feature_names:
-            continue
-        dtype_str = str(df[col].dtype)
-        feature = Feature(
-            id=str(uuid.uuid4()),
-            dataset_id=dataset_record.id,
-            name=col,
-            dtype=dtype_str,
-            transformation="passthrough",
-            status="ACTIVE",
-            version=1
-        )
-        session.add(feature)
-        new_features.append(col)
+    await session.commit()
+    
+    # Fire EventBus Event for Lifecycle Orchestrator
+    try:
+        from app.events import get_event_bus
+        from app.events.schema import Event, EventType, EventSeverity
+        bus = get_event_bus()
+        if bus:
+            await bus.publish(Event(
+                type=EventType.DATASET_UPLOADED,
+                source="datasets.api",
+                severity=EventSeverity.INFO,
+                payload={
+                    "dataset_id": dataset_record.id,
+                    "dataset_name": dataset_name,
+                    "version": dataset_record.version
+                }
+            ))
+    except Exception as e:
+        logger.warning(f"Failed to publish DATASET_UPLOADED event: {e}")
 
     # Audit log
     await AuditLogger.record(session, AuditEvent(
@@ -220,21 +217,9 @@ async def upload_dataset(
             "file_name": filename,
             "row_count": profile["row_count"],
             "column_count": profile["column_count"],
-            "checksum": checksum,
-            "new_features": new_features
+            "checksum": checksum
         }
     ))
-
-    await session.commit()
-
-    # Trigger training in background
-    if auto_train and new_features:
-        background_tasks.add_task(
-            _auto_train_background,
-            dataset_record.id,
-            dataset_name,
-            save_path
-        )
 
     return {
         "status": "success",
@@ -244,10 +229,8 @@ async def upload_dataset(
         "row_count": profile["row_count"],
         "column_count": profile["column_count"],
         "columns": list(df.columns),
-        "new_features_registered": new_features,
         "profile": profile,
-        "training_triggered": auto_train and bool(new_features),
-        "message": f"Dataset '{dataset_name}' uploaded successfully. Training pipeline {'triggered' if auto_train else 'not triggered'}."
+        "message": f"Dataset '{dataset_name}' uploaded successfully. Lifecycle pipeline triggered via EventBus."
     }
 
 

@@ -52,15 +52,42 @@ class BaseFeature(ABC):
             )
 
     @abstractmethod
+    def fit(self, df: pd.DataFrame) -> dict:
+        """
+        Computes feature statistics (mean, std, vocab) required for transformation.
+        
+        Args:
+            df: Validated DataFrame.
+            
+        Returns:
+            A dictionary containing the state.
+        """
+        ...
+
+    @abstractmethod
     def transform(self, df: pd.DataFrame) -> pd.Series:
         """
-        Business logic for computing the feature.
+        Business logic for computing the feature using self.metadata.state.
 
         Args:
             df: Validated DataFrame guaranteed to contain the source_columns.
 
         Returns:
             A Pandas Series corresponding precisely to the input row dimensions.
+        """
+        ...
+        
+    @abstractmethod
+    def transform_single(self, data: dict) -> Any:
+        """
+        High-performance business logic for computing the feature for a single online request.
+        Uses self.metadata.state.
+        
+        Args:
+            data: Raw dictionary from online inference request.
+            
+        Returns:
+            A single primitive value.
         """
         ...
 

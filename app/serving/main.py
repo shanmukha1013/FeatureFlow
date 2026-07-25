@@ -98,6 +98,10 @@ async def lifespan(app: FastAPI):
         set_event_bus(event_bus)
         await event_bus.start()
         
+        from app.services.lifecycle import LifecycleOrchestrator
+        lifecycle_orchestrator = LifecycleOrchestrator(event_bus)
+        app.state.lifecycle = lifecycle_orchestrator
+        
         health_monitor = get_health_monitor(redis_client)
         await health_monitor.start()
     except Exception as e:

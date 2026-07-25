@@ -21,7 +21,7 @@ class EventBus:
         if self._listener_task is not None:
             return
 
-        redis_conn = await self.redis.get_client()
+        redis_conn = self.redis.client
         if not redis_conn:
             logger.warning("Redis client not available, EventBus running in detached mode")
             return
@@ -45,7 +45,7 @@ class EventBus:
 
     async def publish(self, event: Event):
         """Publishes an event to the Redis channel."""
-        redis_conn = await self.redis.get_client()
+        redis_conn = self.redis.client
         if redis_conn:
             # Serialize the event (handling datetime)
             payload = event.model_dump_json()
@@ -68,7 +68,9 @@ class EventBus:
         try:
             async for message in self._pubsub.listen():
                 if message["type"] == "message":
-                    raw_data = message["data"].decode("utf-8")
+                    raw_data = message["data"]
+                    if isinstance(raw_data, bytes):
+                        raw_data = raw_data.decode("utf-8")
                     try:
                         event = Event.model_validate_json(raw_data)
                         await self._dispatch(event)

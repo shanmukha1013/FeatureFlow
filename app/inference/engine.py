@@ -269,11 +269,67 @@ class PredictionEngine:
                             timestamp=request.timestamp
                         )
                         logger.info(f"Using online feature vector (source: {source}) for entity {request.entity_id}.")
+                        
+                        try:
+                            from app.events import get_event_bus
+                            from app.events.schema import Event, EventType, EventSeverity
+                            bus = get_event_bus()
+                            if bus:
+                                await bus.publish(Event(
+                                    type=EventType.FEATURE_RETRIEVED,
+                                    source="inference.engine",
+                                    severity=EventSeverity.INFO,
+                                    payload={
+                                        "entity_id": request.entity_id,
+                                        "dataset_key": dataset_key,
+                                        "source": source
+                                    }
+                                ))
+                        except Exception as cache_e2:
+                            logger.warning(f"Error publishing FEATURE_RETRIEVED event: {cache_e2}")
                 except Exception as cache_e:
                     logger.warning(f"Error checking online feature store during prediction for {request.entity_id}: {cache_e}")
 
             try:
                 response = predictor.predict(enhanced_request)
+
+                # Training-Serving Skew Audit Logging
+                if response.warnings:
+                    for warning in response.warnings:
+                        if "TRAINING-SERVING SKEW DETECTED" in warning:
+                            async with AsyncSessionLocal() as session:
+                                await AuditLogger.record(
+                                    session, 
+                                    AuditEvent(
+                                        event_name="TRAINING_SERVING_SKEW", 
+                                        component="PredictionEngine", 
+                                        severity="WARNING", 
+                                        payload={
+                                            "model_id": model_id,
+                                            "request_id": request.request_id,
+                                            "warning": warning
+                                        }
+                                    )
+                                )
+                                await session.commit()
+                                
+                            try:
+                                from app.events import get_event_bus
+                                from app.events.schema import Event, EventType, EventSeverity
+                                bus = get_event_bus()
+                                if bus:
+                                    await bus.publish(Event(
+                                        type=EventType.TRAINING_SERVING_SKEW_DETECTED,
+                                        source="inference.engine",
+                                        severity=EventSeverity.WARNING,
+                                        payload={
+                                            "model_id": model_id,
+                                            "request_id": request.request_id,
+                                            "warning": warning
+                                        }
+                                    ))
+                            except Exception as e_skew:
+                                logger.warning(f"Failed to publish SKEW event: {e_skew}")
 
                 # Store prediction in cache (Requirement 2 & 11)
                 try:

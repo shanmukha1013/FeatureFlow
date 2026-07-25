@@ -56,24 +56,57 @@ class ModelPredictor(BasePredictor):
         """
         start_time = time.perf_counter()
 
-        # 1. Prepare features dictionary (handle raw or engineered features)
+        # 1. Prepare features dictionary
         features_dict = dict(request.features)
 
-        if self.expected_features and any(f not in features_dict for f in self.expected_features):
+        # Apply Stateful Canonical Transformations for Inference
+        if self.features_meta:
             try:
+                import hashlib
+                import json
                 from app.features.transformer import FeatureTransformer
-                raw_df = pd.DataFrame([features_dict])
-                transformed_df = FeatureTransformer().transform(raw_df, self.features_meta)
-                features_dict.update(transformed_df.iloc[0].to_dict())
+                
+                # Enforce Training-Serving Consistency Hash Match
+                hash_payload = []
+                for f in self.features_meta:
+                    hash_payload.append({
+                        "id": f.id,
+                        "name": f.name,
+                        "transformation": f.transformation,
+                        "state": getattr(f, 'state', {})
+                    })
+                
+                hash_str = json.dumps(hash_payload, sort_keys=True)
+                serving_feature_hash = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()
+                
+                training_feature_hash = None
+                if self.metadata and self.metadata.metrics:
+                    training_feature_hash = self.metadata.metrics.get("training_feature_hash")
+                
+                if training_feature_hash and training_feature_hash != serving_feature_hash:
+                    # TRAINING-SERVING SKEW DETECTED!
+                    msg = f"TRAINING-SERVING SKEW DETECTED for model {self.model_id}. Training hash: {training_feature_hash}, Serving hash: {serving_feature_hash}"
+                    logger.error(msg)
+                    self.skew_detected = True
+                    self.skew_message = msg
+                else:
+                    self.skew_detected = False
+                
+                transformed_dict = FeatureTransformer().transform_single(features_dict, self.features_meta)
+                features_dict.update(transformed_dict)
             except Exception as e:
                 logger.warning(f"Could not transform raw features during inference: {e}")
 
         # 2. Strict Validation Boundary
+        warnings_list = []
+        if getattr(self, 'skew_detected', False):
+            warnings_list.append(self.skew_message)
+            
         try:
-            warnings = self.validator.validate(request, self.expected_features)
+            warnings_list.extend(self.validator.validate(request, self.expected_features))
         except InputValidationError as e:
             if all(f in features_dict for f in self.expected_features):
-                warnings = []
+                pass # warnings already appended skew
             else:
                 logger.error(f"Validation failure for request '{request.request_id}': {e}")
                 raise
@@ -110,7 +143,7 @@ class ModelPredictor(BasePredictor):
                 model_version=self.version,
                 algorithm=self.metadata.algorithm or "unknown",
                 timestamp=datetime.now(timezone.utc).isoformat(),
-                warnings=warnings,
+                warnings=warnings_list,
                 top_contributors=explanation.get("top_contributors", []),
                 positive_contributors=explanation.get("positive_contributors", []),
                 negative_contributors=explanation.get("negative_contributors", []),

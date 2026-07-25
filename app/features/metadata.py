@@ -38,6 +38,7 @@ class FeatureMetadata:
     created_at: str = ""
     last_updated: str = ""
     tags: List[str] = field(default_factory=list)
+    state: dict = field(default_factory=dict)
     nullable: bool = True
     default_value: Optional[Any] = None
 

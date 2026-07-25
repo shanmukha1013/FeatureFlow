@@ -12,8 +12,12 @@ class EventType(str, Enum):
     DATASET_FAILED = "Dataset.Failed"
 
     # Feature Events
+    DATASET_PROFILED = "Dataset.Profiled"
+    FEATURES_REGISTERED = "Features.Registered"
     FEATURE_MATERIALIZED = "Feature.Materialized"
     FEATURE_DRIFT_DETECTED = "Feature.DriftDetected"
+    FEATURE_RETRIEVED = "Feature.Retrieved"
+    TRAINING_SERVING_SKEW_DETECTED = "Feature.TrainingServingSkewDetected"
 
     # ML Events
     JOB_STARTED = "Job.Started"
