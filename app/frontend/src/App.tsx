@@ -16,7 +16,6 @@ import { Pipelines } from './pages/Pipelines';
 import { Health } from './pages/Health';
 import { Settings } from './pages/Settings';
 import { Monitoring } from './pages/Monitoring';
-import { Landing } from './pages/Landing';
 
 
 import { PlatformProvider } from './contexts/PlatformContext';
@@ -25,7 +24,7 @@ const App = () => {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<Navigate to="/platform/dashboard" replace />} />
         <Route path="/platform" element={
             <PlatformProvider>
               <AppLayout />
