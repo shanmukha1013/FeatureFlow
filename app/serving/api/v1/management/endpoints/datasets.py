@@ -123,11 +123,9 @@ async def upload_dataset(
     # Dataset name
     dataset_name = name or filename.rsplit(".", 1)[0].replace(" ", "_").lower()
 
-    # Save file to disk
-    raw_dir = os.path.join(DATASETS_DIR, "raw")
-    os.makedirs(raw_dir, exist_ok=True)
-    save_path = os.path.join(raw_dir, f"{dataset_name}.csv")
-    df.to_csv(save_path, index=False)
+    # We will no longer save the file to local disk (DATASETS_DIR)
+    # Instead, we will store the raw bytes in the PostgreSQL Database
+    save_path = f"db://datasets/{dataset_name}.csv"
 
     # Compute profile
     profile = _compute_profile(df)
@@ -160,6 +158,12 @@ async def upload_dataset(
 
     await session.flush()
 
+    # Convert DataFrame back to CSV bytes for storage
+    import io
+    csv_buffer = io.BytesIO()
+    df.to_csv(csv_buffer, index=False)
+    csv_bytes = csv_buffer.getvalue()
+
     # Create DatasetVersion
     dv_result = await session.execute(
         select(DatasetVersion).filter(
@@ -174,6 +178,7 @@ async def upload_dataset(
             dataset_id=dataset_record.id,
             version_tag=checksum,
             file_path=save_path,
+            raw_data=csv_bytes,
             row_count=profile["row_count"],
             status="ACTIVE",
             version=dataset_record.version

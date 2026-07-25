@@ -6,6 +6,7 @@ from .endpoints import overview_router, registries_router, pipelines_router, obs
 from .endpoints.datasets import router as datasets_router
 from .endpoints.retraining import router as retraining_router
 from .endpoints.enterprise import router as enterprise_router
+from .endpoints.workspace import router as workspace_router
 
 management_router = APIRouter(
     prefix="/management",
@@ -22,3 +23,4 @@ management_router.include_router(observability_router, prefix="/observability")
 management_router.include_router(observability_router)  # backward compatibility for /management/audit
 management_router.include_router(retraining_router)
 management_router.include_router(enterprise_router)
+management_router.include_router(workspace_router, prefix="/workspace")

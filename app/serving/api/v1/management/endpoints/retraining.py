@@ -82,7 +82,56 @@ async def start_retraining(req: StartRetrainingRequest, background_tasks: Backgr
 @router.post("/rollback")
 async def rollback_model(req: RollbackRequest, session: AsyncSession = Depends(get_db)):
     """Rolls back the active model to a previous archived champion."""
-    raise HTTPException(status_code=501, detail="Model rollback is not yet implemented.")
+    from app.storage.models import Dataset, Model, ChampionModel
+    
+    # 1. Find the dataset
+    ds_res = await session.execute(select(Dataset).filter(Dataset.name == req.dataset_name))
+    dataset = ds_res.scalars().first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+        
+    # 2. Get the current champion
+    champ_res = await session.execute(select(ChampionModel).filter(ChampionModel.dataset_id == dataset.id))
+    current_champ = champ_res.scalars().first()
+    
+    # 3. Find the previous model
+    query = select(Model).filter(Model.dataset_id == dataset.id).order_by(desc(Model.created_at))
+    models_res = await session.execute(query)
+    models = models_res.scalars().all()
+    
+    if len(models) < 2:
+        raise HTTPException(status_code=400, detail="Not enough models to rollback. Need at least 2.")
+        
+    # Identify the rollback target (the newest model that is not the current champion)
+    target_model = None
+    for m in models:
+        if not current_champ or m.id != current_champ.model_id:
+            target_model = m
+            break
+            
+    if not target_model:
+        raise HTTPException(status_code=400, detail="No valid previous model found.")
+        
+    # 4. Perform Rollback
+    if current_champ:
+        current_champ.model_id = target_model.id
+    else:
+        current_champ = ChampionModel(dataset_id=dataset.id, model_id=target_model.id, status="ACTIVE")
+        session.add(current_champ)
+        
+    # Update statuses
+    if current_champ:
+        old_champ_model_res = await session.execute(select(Model).filter(Model.id == current_champ.model_id))
+        old_champ = old_champ_model_res.scalars().first()
+        if old_champ:
+            old_champ.status = "ARCHIVED"
+            
+    target_model.status = "CHAMPION"
+    
+    await AuditLogger.record(session, AuditEvent("ROLLBACK_EXECUTED", "RetrainingAPI", "WARNING", {"dataset": req.dataset_name, "rolled_back_to": target_model.id}))
+    await session.commit()
+    
+    return {"status": "SUCCESS", "message": f"Rolled back to model {target_model.id}"}
 
 
 @router.get("/history")

@@ -9,7 +9,12 @@ interface Column {
 
 export const DataTable = ({ columns, data }: { columns: Column[], data: any[] }) => {
   if (!data || data.length === 0) {
-    return <EmptyState title="No records found" message="There is no data to display for this view." />;
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <h3 className="text-lg font-medium text-white mb-2">No data yet</h3>
+        <p className="text-gray-400 mb-6 max-w-md">There are no records to display here. Get started by uploading a dataset, running an experiment, or loading the sample workspace from the dashboard.</p>
+      </div>
+    );
   }
 
   return (

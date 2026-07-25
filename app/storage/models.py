@@ -2,7 +2,7 @@ from app.storage.database import Base
 from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, UniqueConstraint, LargeBinary
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
 
@@ -42,6 +42,7 @@ class DatasetVersion(Base):
     dataset_id = Column(String, ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False, index=True)
     version_tag = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
+    raw_data = Column(LargeBinary, nullable=True)
     row_count = Column(Integer, nullable=True)
     status = Column(String, default="VALIDATED", index=True)
     version = Column(Integer, default=1)

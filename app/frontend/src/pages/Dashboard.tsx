@@ -26,6 +26,38 @@ export const Dashboard = () => {
         <MetricCard title="Registered Datasets" value={stats?.registered_datasets || 0} />
       </div>
 
+      {stats?.registered_datasets === 0 && (
+        <div className="bg-gradient-to-br from-indigo-900/40 to-[#1e1e1e] border border-indigo-500/30 p-8 rounded-xl mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h2 className="text-2xl font-bold text-white mb-2">Welcome to FeatureFlow</h2>
+          <p className="text-gray-300 mb-6 max-w-2xl">
+            Your Enterprise MLOps platform is ready. Get started by connecting your data, uploading a dataset, or loading our pre-built sample workspace to see FeatureFlow in action.
+          </p>
+          <div className="flex gap-4 flex-wrap">
+            <button 
+              onClick={() => navigate('/platform/datasets')}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Database className="w-4 h-4" />
+              Upload Dataset
+            </button>
+            <button 
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/v1/management/workspace/sample', { method: 'POST' });
+                  if (res.ok) window.location.reload();
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+              className="px-6 py-3 bg-[#2a2a2a] hover:bg-[#333] border border-gray-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Box className="w-4 h-4" />
+              Load Sample Workspace
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
             <div className="bg-[#1e1e1e] p-6 rounded-lg border border-gray-800">

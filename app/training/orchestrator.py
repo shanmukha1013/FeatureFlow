@@ -68,11 +68,21 @@ class TrainingOrchestrator:
         logger.info(f"Starting Training Orchestration for dataset '{dataset_name}'")
 
         try:
-            from app.data.loader import CSVDataLoader
-            loader = CSVDataLoader(self.data_dir)
-            if not relative_path:
-                relative_path = f"raw/{dataset_name}.csv"
-            df_raw = loader.load(relative_path)
+            import io
+            from sqlalchemy.future import select
+            from app.storage.models import DatasetVersion
+
+            dv_res = await session.execute(
+                select(DatasetVersion)
+                .filter(DatasetVersion.dataset_id == dataset_record.id)
+                .order_by(DatasetVersion.created_at.desc())
+            )
+            dataset_version = dv_res.scalars().first()
+            if not dataset_version or not dataset_version.raw_data:
+                logger.error(f"No raw data found in PostgreSQL for dataset '{dataset_name}'.")
+                return
+
+            df_raw = pd.read_csv(io.BytesIO(dataset_version.raw_data))
 
             target_col = self._select_target_column(df_raw, dataset_name)
 
@@ -219,11 +229,14 @@ class TrainingOrchestrator:
                     shap_summ = explainer.compute_shap_summary(ml_model, X_train)
 
                     baseline_profile = BaselineProfiler.compute_baseline(X_train, y_train)
+                    metrics["baseline_profile"] = baseline_profile
                     await AuditLogger.record(session, AuditEvent(event_name="BASELINE_UPDATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str, "baseline_features": len(baseline_profile) if isinstance(baseline_profile, dict) else 0}))
 
                     if feat_imp:
+                        metrics["feature_importance"] = feat_imp
                         await AuditLogger.record(session, AuditEvent(event_name="EXPLANATION_GENERATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str}))
                     if shap_summ:
+                        metrics["shap_summary"] = shap_summ
                         await AuditLogger.record(session, AuditEvent(event_name="SHAP_GENERATED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str}))
 
                     # 6. Register Model
