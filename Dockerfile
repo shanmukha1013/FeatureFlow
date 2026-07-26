@@ -51,6 +51,9 @@ RUN groupadd -r featureflow && useradd -r -g featureflow featureflow
 COPY --from=builder /app/wheels /wheels
 COPY requirements.txt .
 RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt && \
+    # Evidently installs Litestar which installs the wrong 'multipart' package.
+    # We must uninstall it so it doesn't conflict with 'python-multipart'.
+    pip uninstall -y multipart && \
     # Install great-expectations without resolving its stale numpy<2 constraint
     pip install --no-cache-dir --no-index --no-deps --find-links=/wheels great-expectations==0.18.22 && \
     rm -rf /wheels

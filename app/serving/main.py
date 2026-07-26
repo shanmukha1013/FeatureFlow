@@ -1,3 +1,18 @@
+import sys
+
+# Prevent Evidently/Litestar from crashing when python-multipart is used instead of multipart.
+# Litestar expects Marcel Hellkamp's 'multipart' package which provides MultipartSegment.
+# python-multipart (by Andrew Dunham) provides the 'multipart' namespace but lacks this class.
+# Since we only use python-multipart for FastAPI, we inject a dummy class to satisfy Litestar.
+try:
+    import multipart
+    if not hasattr(multipart, "MultipartSegment"):
+        multipart.MultipartSegment = type("MultipartSegment", (), {})
+    if not hasattr(multipart, "ParserError"):
+        multipart.ParserError = type("ParserError", (Exception,), {})
+except ImportError:
+    pass
+
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
 
