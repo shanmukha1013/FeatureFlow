@@ -136,6 +136,9 @@ class RedisClient:
                 if self._semaphore is None:
                     self._semaphore = asyncio.Semaphore(self.pool_size)
 
+                # Actually verify connection
+                await self._client.ping()
+
                 self._is_connected = True
                 self.last_connected_at = time.time()
                 logger.info(f"Successfully connected to Redis Cloud ({sanitized}) with pool size {self.pool_size}.")

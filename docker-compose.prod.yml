@@ -9,6 +9,10 @@ services:
       - "8000:8000"
     env_file:
       - .env.production
+    environment:
+      # Override URLs to use docker-compose service hostnames
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://featureflow:featureflow@postgres:5432/featureflow_production
     depends_on:
       redis:
         condition: service_started

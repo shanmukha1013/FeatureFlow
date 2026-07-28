@@ -10,7 +10,7 @@ import ReactFlow, {
   Position
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { api } from '../services/api';
+import { apiClient as api } from '../api/client';
 import { 
   Database, Box, PlayCircle, FileJson, 
   AlertTriangle, Lightbulb, CheckCircle2 

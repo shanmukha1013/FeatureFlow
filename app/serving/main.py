@@ -120,35 +120,42 @@ async def lifespan(app: FastAPI):
 
     await validate_startup()
 
-    # Note: ML Model loading (_prediction_engine.start) has been removed from startup.
-    # Phase 5: Initialize Redis Subsystem
-    # In V3, Redis also powers our core EventBus
-    try:
-        redis_client = RedisClient()
-        await redis_client.connect()
-        app.state.redis = redis_client
-        
-        # Initialize EventBus
+    # Phase 5: Initialize Redis Subsystem (optional – degrades gracefully if unavailable)
+    # In V3, Redis also powers our core EventBus.
+    # REDIS_URL must be set in the environment.  On Render, set it to your
+    # Redis Cloud / Upstash URL.  In docker-compose, set REDIS_URL=redis://redis:6379/0
+    redis_client = RedisClient()
+    connected = await redis_client.connect()
+    app.state.redis = redis_client
+
+    if connected:
+        # Initialize EventBus only when Redis is actually reachable
         event_bus = EventBus(redis_client)
         set_event_bus(event_bus)
         await event_bus.start()
+
         from app.services.lifecycle import LifecycleOrchestrator
         lifecycle_orchestrator = LifecycleOrchestrator(event_bus)
         app.state.lifecycle = lifecycle_orchestrator
-        
+
         from app.features.sync_worker import OnlineStoreSyncWorker
         sync_worker = OnlineStoreSyncWorker(event_bus)
         app.state.sync_worker = sync_worker
-        
+
         health_monitor = await get_health_monitor()
         await health_monitor.start()
-    except Exception as e:
-        import sys
-        print(f"CRITICAL: Failed to initialize Redis subsystem: {e}", file=sys.stderr)
-        sys.exit(1)
 
-    recovery_manager = await get_recovery_manager()
-    await recovery_manager.start()
+        recovery_manager = await get_recovery_manager()
+        await recovery_manager.start()
+    else:
+        logger.warning(
+            "Redis is unavailable (REDIS_URL=%s). "
+            "EventBus, health monitor, and recovery manager are disabled. "
+            "The application will run in degraded mode using PostgreSQL only.",
+            settings.redis_url or "NOT SET"
+        )
+        health_monitor = None
+        recovery_manager = None
 
     # Emit REDIS_CONNECTED audit event
     try:
@@ -180,8 +187,8 @@ async def lifespan(app: FastAPI):
     if event_bus:
         await event_bus.stop()
         
-    await health_monitor.stop()
-    await recovery_manager.stop()
+    await health_monitor.stop() if health_monitor else None
+    await recovery_manager.stop() if recovery_manager else None
 
     # Emit REDIS_DISCONNECTED audit event
     try:

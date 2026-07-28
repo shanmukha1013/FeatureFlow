@@ -22,14 +22,18 @@ class EventBus:
             return
 
         redis_conn = self.redis.client
-        if not redis_conn:
+        if not redis_conn or not self.redis.is_connected:
             logger.warning("Redis client not available, EventBus running in detached mode")
             return
 
-        self._pubsub = redis_conn.pubsub()
-        await self._pubsub.subscribe(self.channel_name)
-        self._listener_task = asyncio.create_task(self._listen())
-        logger.info("EventBus started and subscribed to channel: %s", self.channel_name)
+        try:
+            self._pubsub = redis_conn.pubsub()
+            await self._pubsub.subscribe(self.channel_name)
+            self._listener_task = asyncio.create_task(self._listen())
+            logger.info("EventBus started and subscribed to channel: %s", self.channel_name)
+        except Exception as e:
+            logger.warning(f"Failed to subscribe to EventBus channel (detached mode): {e}")
+            self._pubsub = None
 
     async def stop(self):
         """Stops the event bus listener."""
