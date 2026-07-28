@@ -7,6 +7,19 @@ from app.features.feature import BaseFeature
 # NUMERIC TRANSFORMATIONS
 # =======================
 
+class PassthroughFeature(BaseFeature):
+    def fit(self, df: pd.DataFrame) -> dict:
+        return {}
+
+    def transform(self, df: pd.DataFrame) -> pd.Series:
+        col = self.metadata.source_columns[0]
+        return df[col]
+
+    def transform_single(self, data: dict) -> Any:
+        col = self.metadata.source_columns[0]
+        return data.get(col)
+
+
 
 class StandardScalerFeature(BaseFeature):
     def fit(self, df: pd.DataFrame) -> dict:

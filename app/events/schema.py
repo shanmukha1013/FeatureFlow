@@ -15,6 +15,8 @@ class EventType(str, Enum):
     DATASET_PROFILED = "Dataset.Profiled"
     FEATURES_REGISTERED = "Features.Registered"
     FEATURE_MATERIALIZED = "Feature.Materialized"
+    FEATURE_VALUES_CREATED = "Feature.ValuesCreated"
+    ONLINE_STORE_SYNCED = "Feature.OnlineStoreSynced"
     FEATURE_DRIFT_DETECTED = "Feature.DriftDetected"
     FEATURE_RETRIEVED = "Feature.Retrieved"
     TRAINING_SERVING_SKEW_DETECTED = "Feature.TrainingServingSkewDetected"

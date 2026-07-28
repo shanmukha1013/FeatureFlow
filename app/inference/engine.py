@@ -88,7 +88,14 @@ class PredictionEngine:
                     feature_result = await session.execute(
                         select(Feature).options(selectinload(Feature.dataset)).filter(Feature.dataset_id == meta.dataset_id)
                     )
-                    features_meta = feature_result.scalars().all()
+                    all_features_meta = feature_result.scalars().all()
+                    
+                    # Filter to only the features seen during training
+                    if meta.feature_lineage:
+                        lineage_names = {f.get("name") for f in meta.feature_lineage if isinstance(f, dict)}
+                        features_meta = [f for f in all_features_meta if f.name in lineage_names]
+                    else:
+                        features_meta = all_features_meta
 
                     predictor = ModelPredictor(
                         model_id=meta.id,

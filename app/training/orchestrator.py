@@ -90,6 +90,13 @@ class TrainingOrchestrator:
             import hashlib
             import json
             
+            target_col = self._select_target_column(pd.read_csv(io.BytesIO(dataset_version.raw_data)), dataset_name)
+            exclude_cols = {target_col}
+            if getattr(dataset_record, "entity_key_column", None):
+                exclude_cols.add(dataset_record.entity_key_column)
+            
+            features = [f for f in features if f.name not in exclude_cols]
+
             # Compute canonical feature hash for Training-Serving consistency (Lineage)
             hash_payload = []
             for f in features:
@@ -114,8 +121,8 @@ class TrainingOrchestrator:
                 df_features = self.feature_transformer.transform(df_raw, features)
 
             target_col = self._select_target_column(df_raw, dataset_name)
+            
             feature_names = [f.name for f in features]
-
             df_features[target_col] = df_raw[target_col]
             df_features.dropna(subset=[target_col], inplace=True)
 

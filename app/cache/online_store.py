@@ -188,7 +188,7 @@ class OnlineFeatureStore:
                 ds_obj = await ds_repo.get_by_name(dataset)
                 if not ds_obj:
                     # Maybe dataset parameter passed is already the UUID
-                    ds_obj = await ds_repo.get_by_id(dataset)
+                    ds_obj = await ds_repo.get(dataset)
 
                 ds_id = ds_obj.id if ds_obj else dataset
                 ds_version = ds_obj.version if ds_obj else 1

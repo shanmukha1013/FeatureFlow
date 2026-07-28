@@ -32,20 +32,27 @@ class FeatureTransformer:
         
         # Heuristic to find the original column name if not explicitly stored
         col_name = None
+        col_name = None
         if isinstance(df_or_dict, pd.DataFrame):
-            for col in df_or_dict.columns:
-                if f"_{col}_" in name:
-                    col_name = col
-                    break
-            if not col_name and not df_or_dict.empty:
-                col_name = df_or_dict.columns[0]
+            if name in df_or_dict.columns:
+                col_name = name
+            else:
+                for col in df_or_dict.columns:
+                    if f"_{col}_" in name:
+                        col_name = col
+                        break
+                if not col_name and not df_or_dict.empty:
+                    col_name = df_or_dict.columns[0]
         else:
-            for col in df_or_dict.keys():
-                if f"_{col}_" in name:
-                    col_name = col
-                    break
-            if not col_name and df_or_dict:
-                col_name = list(df_or_dict.keys())[0]
+            if name in df_or_dict:
+                col_name = name
+            else:
+                for col in df_or_dict.keys():
+                    if f"_{col}_" in name:
+                        col_name = col
+                        break
+                if not col_name and df_or_dict:
+                    col_name = list(df_or_dict.keys())[0]
 
         ds_name = ""
         try:

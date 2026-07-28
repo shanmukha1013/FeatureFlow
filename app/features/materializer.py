@@ -57,18 +57,72 @@ class FeatureMaterializer:
                 logger.info(f"[Materializer] Transforming raw data...")
                 materialized_df = transformer.transform(df, features)
                 
+                # Retrieve the actual entity column name from Dataset
+                from app.storage.models import Dataset
+                ds_res = await session.execute(select(Dataset).filter(Dataset.id == dataset_id))
+                dataset_record = ds_res.scalars().first()
+                entity_col = dataset_record.entity_key_column if dataset_record and dataset_record.entity_key_column else "_entity_id"
+                
+                # Copy the entity key column from raw data into materialized_df so it can be extracted
+                if entity_col in df.columns:
+                    materialized_df[entity_col] = df[entity_col]
+                
                 # 4. Save materialized data (Parquet)
                 parquet_buffer = io.BytesIO()
                 materialized_df.to_parquet(parquet_buffer, index=False)
                 dataset_version.materialized_data = parquet_buffer.getvalue()
                 
-                # We also commit the feature states computed by `fit()`
+                # 5. Extract and Persist Feature Values (Offline Store / Source of Truth)
+                from app.storage.models import FeatureValue, Dataset
+                import uuid
+                import json
+                
+                logger.info(f"[Materializer] Extracting feature values to PostgreSQL...")
+                ds_res = await session.execute(select(Dataset).filter(Dataset.id == dataset_id))
+                dataset_record = ds_res.scalars().first()
+                entity_col = dataset_record.entity_key_column if dataset_record and dataset_record.entity_key_column else "_entity_id"
+                
+                # Map feature name -> feature_id
+                feature_name_to_id = {f.name: f.id for f in features}
+                
+                feature_values_to_insert = []
+                for _, row in materialized_df.iterrows():
+                    entity_id = str(row.get(entity_col, uuid.uuid4()))
+                    for f_name, f_id in feature_name_to_id.items():
+                        if f_name in row:
+                            val = row[f_name]
+                            if pd.isna(val):
+                                val = None
+                            elif hasattr(val, "item"):
+                                val = val.item() # convert numpy types
+                                
+                            feature_values_to_insert.append({
+                                "id": str(uuid.uuid4()),
+                                "feature_id": f_id,
+                                "entity_id": entity_id,
+                                "value_json": {"value": val},
+                                "status": "ACTIVE",
+                                "version": 1
+                            })
+                
+                if feature_values_to_insert:
+                    from sqlalchemy import insert
+                    await session.execute(insert(FeatureValue).values(feature_values_to_insert))
+                    
+                # We also commit the feature states computed by `fit()` and inserted FeatureValues
                 await session.commit()
-                logger.info(f"[Materializer] Successfully materialized {len(materialized_df)} rows for {dataset_name}")
+                logger.info(f"[Materializer] Successfully materialized {len(materialized_df)} rows and persisted {len(feature_values_to_insert)} feature values for {dataset_name}")
 
-            # Publish event
+            # Publish events
             await self.bus.publish(Event(
                 type=EventType.FEATURE_MATERIALIZED,
+                source="feature.materializer",
+                severity=EventSeverity.INFO,
+                payload={"dataset_id": dataset_id, "dataset_name": dataset_name}
+            ))
+            
+            await self.bus.publish(Event(
+                type=EventType.FEATURE_VALUES_CREATED,
                 source="feature.materializer",
                 severity=EventSeverity.INFO,
                 payload={"dataset_id": dataset_id, "dataset_name": dataset_name}

@@ -25,6 +25,7 @@ class Dataset(Base):
     name = Column(String, unique=True, index=True, nullable=False)
     description = Column(String, nullable=True)
     inferred_dtypes = Column(JSONB, nullable=True)
+    entity_key_column = Column(String, nullable=True)
     status = Column(String, default="ACTIVE", index=True)
     version = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), default=utcnow, index=True)

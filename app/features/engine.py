@@ -9,7 +9,8 @@ from app.features.builtin_transformers import (
     DatetimeYearFeature, DatetimeMonthFeature, DatetimeDayFeature, DatetimeHourFeature,
     DatetimeWeekdayFeature, DatetimeWeekendFeature, DatetimeQuarterFeature,
     BinaryConversionFeature,
-    TextLengthFeature, TextWordCountFeature, TextCharacterCountFeature
+    TextLengthFeature, TextWordCountFeature, TextCharacterCountFeature,
+    PassthroughFeature
 )
 
 logger = get_logger(__name__)
@@ -44,6 +45,9 @@ FEATURE_MAPPINGS: Dict[str, List[Dict[str, Any]]] = {
         {"class": TextLengthFeature, "name": "length", "transformation": "Length", "dtype": "int64"},
         {"class": TextWordCountFeature, "name": "word_count", "transformation": "Word Count", "dtype": "int64"},
         {"class": TextCharacterCountFeature, "name": "char_count", "transformation": "Character Count", "dtype": "int64"}
+    ],
+    "passthrough": [
+        {"class": PassthroughFeature, "name": "passthrough", "transformation": "passthrough", "dtype": "object"}
     ]
 }
 

@@ -117,8 +117,8 @@ class ModelPredictor(BasePredictor):
             df = pd.DataFrame(ordered_features)
 
             # 3. Execution
-            prediction = self.model.predict(df)[0]
-
+            prediction_raw = self.model.predict(df)[0]
+            prediction = prediction_raw.item() if hasattr(prediction_raw, "item") else prediction_raw
             probability: Optional[float] = None
             if hasattr(self.model, "predict_proba"):
                 # Simplistic extraction of the highest probability class

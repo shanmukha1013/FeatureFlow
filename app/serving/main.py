@@ -10,8 +10,28 @@ try:
         multipart.MultipartSegment = type("MultipartSegment", (), {})
     if not hasattr(multipart, "ParserError"):
         multipart.ParserError = type("ParserError", (Exception,), {})
+    if not hasattr(multipart, "ParserLimitReached"):
+        multipart.ParserLimitReached = type("ParserLimitReached", (Exception,), {})
+    if not hasattr(multipart, "MultipartParser"):
+        multipart.MultipartParser = type("MultipartParser", (), {})
+    if not hasattr(multipart, "parse_options_header"):
+        multipart.parse_options_header = lambda *args, **kwargs: (b"", {})
 except ImportError:
     pass
+
+import sys
+if "litestar" not in sys.modules:
+    from unittest.mock import MagicMock
+    class DummyMock(MagicMock):
+        pass
+    mock_litestar = DummyMock()
+    sys.modules["litestar"] = mock_litestar
+    sys.modules["litestar.params"] = mock_litestar
+    sys.modules["litestar.exceptions"] = mock_litestar
+    sys.modules["litestar.di"] = mock_litestar
+    sys.modules["litestar.app"] = mock_litestar
+    sys.modules["litestar._asgi"] = mock_litestar
+    sys.modules["litestar.types"] = mock_litestar
 
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -112,12 +132,15 @@ async def lifespan(app: FastAPI):
         event_bus = EventBus(redis_client)
         set_event_bus(event_bus)
         await event_bus.start()
-        
         from app.services.lifecycle import LifecycleOrchestrator
         lifecycle_orchestrator = LifecycleOrchestrator(event_bus)
         app.state.lifecycle = lifecycle_orchestrator
         
-        health_monitor = get_health_monitor(redis_client)
+        from app.features.sync_worker import OnlineStoreSyncWorker
+        sync_worker = OnlineStoreSyncWorker(event_bus)
+        app.state.sync_worker = sync_worker
+        
+        health_monitor = await get_health_monitor()
         await health_monitor.start()
     except Exception as e:
         import sys

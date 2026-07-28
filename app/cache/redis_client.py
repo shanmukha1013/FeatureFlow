@@ -118,14 +118,19 @@ class RedisClient:
             try:
                 self._ensure_loop_safety()
                 if self._pool is None:
-                    self._pool = ConnectionPool.from_url(
-                        self.url,
-                        max_connections=self.pool_size,
-                        socket_timeout=self.timeout,
-                        socket_connect_timeout=self.timeout,
-                        retry_on_timeout=True,
-                        decode_responses=True
-                    )
+                    if self.url and self.url.startswith("fakeredis://"):
+                        import fakeredis.aioredis
+                        self._client = fakeredis.aioredis.FakeRedis(decode_responses=True)
+                        self._pool = self._client.connection_pool
+                    else:
+                        self._pool = ConnectionPool.from_url(
+                            self.url,
+                            max_connections=self.pool_size,
+                            socket_timeout=self.timeout,
+                            socket_connect_timeout=self.timeout,
+                            retry_on_timeout=True,
+                            decode_responses=True
+                        )
                 if self._client is None:
                     self._client = aioredis.Redis(connection_pool=self._pool)
                 if self._semaphore is None:

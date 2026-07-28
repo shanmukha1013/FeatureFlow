@@ -131,7 +131,19 @@ async def upload_dataset(
     profile = _compute_profile(df)
     checksum = _compute_checksum(content)
 
-    # Inferred dtypes dict
+    # Detect or generate Entity ID column
+    entity_key_col = None
+    candidate_cols = ["user_id", "customer_id", "account_id", "transaction_id", "entity_id", "id"]
+    for col in candidate_cols:
+        if col in df.columns:
+            entity_key_col = col
+            break
+            
+    if not entity_key_col:
+        entity_key_col = "_entity_id"
+        df["_entity_id"] = [str(uuid.uuid4()) for _ in range(len(df))]
+
+    # Inferred dtypes dict (do this AFTER adding _entity_id)
     inferred_dtypes = {col: str(df[col].dtype) for col in df.columns}
 
     # Get or create Dataset
@@ -142,6 +154,7 @@ async def upload_dataset(
         # Update version
         dataset_record.version = dataset_record.version + 1
         dataset_record.inferred_dtypes = inferred_dtypes
+        dataset_record.entity_key_column = entity_key_col
         dataset_record.status = "ACTIVE"
         dataset_record.description = description or dataset_record.description
         dataset_record.updated_at = datetime.now(timezone.utc)
@@ -151,6 +164,7 @@ async def upload_dataset(
             name=dataset_name,
             description=description or f"Uploaded from {filename}",
             inferred_dtypes=inferred_dtypes,
+            entity_key_column=entity_key_col,
             status="ACTIVE",
             version=1
         )
