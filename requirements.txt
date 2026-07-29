@@ -171,3 +171,4 @@ colorama==0.4.6; platform_system=="Windows"
 # numpy>=2.0.0, we install GE separately using --no-deps to bypass the stale
 # metadata constraint. See Dockerfile for the install sequence.
 # DO NOT add great-expectations==0.18.22 here — it is handled in the Dockerfile.
+multipart==2.0.0
