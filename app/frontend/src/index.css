@@ -3,8 +3,65 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --surface: #1e1e1e;
+    --surface-alt: #171717;
+    --border: #262626;
+    --border-light: #333333;
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --muted: #999999;
+  }
+  
   body {
     @apply bg-[#0a0a0a] text-[#ededed] antialiased;
+  }
+}
+
+@layer components {
+  .bg-surface {
+    @apply bg-[#1e1e1e];
+  }
+  
+  .border-border {
+    @apply border-[#262626];
+  }
+  
+  .text-muted {
+    @apply text-[#999999];
+  }
+  
+  .bg-primary {
+    @apply bg-[#6366f1];
+  }
+  
+  .text-primary {
+    @apply text-[#6366f1];
+  }
+  
+  .focus-primary {
+    @apply focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1];
+  }
+  
+  .bg-danger {
+    @apply bg-[#ef4444];
+  }
+  
+  .text-danger {
+    @apply text-[#ef4444];
+  }
+  
+  .bg-success {
+    @apply bg-[#10b981];
+  }
+  
+  .text-success {
+    @apply text-[#10b981];
   }
 }
 

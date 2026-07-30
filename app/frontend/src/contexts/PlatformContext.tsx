@@ -4,6 +4,8 @@ import { apiClient } from '../api/client';
 interface PlatformContextType {
   models: any[];
   stats: any | null;
+  isLoading: boolean;
+  error: string | null;
   refreshBootstrap: () => Promise<void>;
 }
 
@@ -20,19 +22,25 @@ export const usePlatform = () => {
 export const PlatformProvider = ({ children }: { children: ReactNode }) => {
   const [models, setModels] = useState<any[]>([]);
   const [stats, setStats] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchStats = async () => {
     try {
       // Independent silent fetches with fallback
-      const platformRes = await apiClient.get('/management/platform').catch(() => ({ data: {} }));
-      const statsRes = await apiClient.get('/management/statistics').catch(() => ({ data: {} }));
+      const [platformRes, statsRes] = await Promise.all([
+        apiClient.get('/management/platform').catch(() => ({ data: {} })),
+        apiClient.get('/management/statistics').catch(() => ({ data: {} }))
+      ]);
       
       setStats({ 
         ...platformRes.data, 
         ...statsRes.data 
       });
+      setError(null);
     } catch (e) {
-      console.error("Failed to fetch stats", e);
+      console.error("[v0] Failed to fetch stats", e);
+      setError('Failed to load platform stats');
     }
   };
 
@@ -40,16 +48,25 @@ export const PlatformProvider = ({ children }: { children: ReactNode }) => {
     try {
       const modelsRes = await apiClient.get('/management/models').catch(() => ({ data: { items: [] } }));
       setModels(modelsRes.data.items || []);
+      setError(null);
     } catch (e) {
-      console.error("Failed to fetch models", e);
+      console.error("[v0] Failed to fetch models", e);
       setModels([]);
+      setError('Failed to load models');
     }
   };
 
   const bootstrap = async () => {
-    // Fire off fetches independently without awaiting them here
-    fetchStats();
-    fetchModels();
+    setIsLoading(true);
+    try {
+      // Fire off fetches independently
+      await Promise.all([fetchStats(), fetchModels()]);
+    } catch (e) {
+      console.error("[v0] Bootstrap error", e);
+      setError('Failed to initialize platform');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -58,7 +75,7 @@ export const PlatformProvider = ({ children }: { children: ReactNode }) => {
 
   // Dashboard renders immediately, no more infinite loading screen blocks
   return (
-    <PlatformContext.Provider value={{ models, stats, refreshBootstrap: bootstrap }}>
+    <PlatformContext.Provider value={{ models, stats, isLoading, error, refreshBootstrap: bootstrap }}>
       {children}
     </PlatformContext.Provider>
   );
