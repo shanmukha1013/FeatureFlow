@@ -10,11 +10,11 @@ Continuously probes Redis connectivity in a background asyncio.Task and:
   - Never restarts FastAPI — recovery is fully transparent
 """
 import asyncio
-from typing import Dict, Any, Optional
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-from app.utils.logger import get_logger
 from app.config import settings
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -168,8 +168,8 @@ class RedisRecoveryManager:
     async def _emit_audit(self, event_name: str, severity: str, payload: Dict[str, Any]) -> None:
         """Records a Redis lifecycle event to PostgreSQL audit log."""
         try:
+            from app.monitoring.audit import AuditEvent, AuditLogger
             from app.storage.database import AsyncSessionLocal
-            from app.monitoring.audit import AuditLogger, AuditEvent
             event = AuditEvent(
                 event_name=event_name,
                 component="RedisRecoveryManager",

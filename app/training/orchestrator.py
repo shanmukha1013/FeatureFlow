@@ -1,20 +1,29 @@
 import time
-import pandas as pd
-from typing import List
 from datetime import datetime, timezone
+from typing import List
 
+import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.utils.logger import get_logger
 from app.features.transformer import FeatureTransformer
-from app.training.dataset import TrainingDatasetBuilder
-from app.training.splitter import RandomSplitter
-from app.training.trainer import LogisticRegressionTrainer, DecisionTreeTrainer, RandomForestTrainer
-from app.training.evaluator import ClassificationEvaluator
-from app.training.artifacts import LocalArtifactStore
-from app.monitoring.audit import AuditLogger, AuditEvent
-from app.storage.repositories.core import ModelRepository, ChampionModelRepository, ExperimentRepository, FeatureRepository
+from app.monitoring.audit import AuditEvent, AuditLogger
 from app.storage.models import Dataset, Feature
+from app.storage.repositories.core import (
+    ChampionModelRepository,
+    ExperimentRepository,
+    FeatureRepository,
+    ModelRepository,
+)
+from app.training.artifacts import LocalArtifactStore
+from app.training.dataset import TrainingDatasetBuilder
+from app.training.evaluator import ClassificationEvaluator
+from app.training.splitter import RandomSplitter
+from app.training.trainer import (
+    DecisionTreeTrainer,
+    LogisticRegressionTrainer,
+    RandomForestTrainer,
+)
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -69,7 +78,9 @@ class TrainingOrchestrator:
 
         try:
             import io
+
             from sqlalchemy.future import select
+
             from app.storage.models import DatasetVersion
 
             dv_res = await session.execute(
@@ -89,12 +100,12 @@ class TrainingOrchestrator:
 
             import hashlib
             import json
-            
+
             target_col = self._select_target_column(pd.read_csv(io.BytesIO(dataset_version.raw_data)), dataset_name)
             exclude_cols = {target_col}
             if getattr(dataset_record, "entity_key_column", None):
                 exclude_cols.add(dataset_record.entity_key_column)
-            
+
             features = [f for f in features if f.name not in exclude_cols]
 
             # Compute canonical feature hash for Training-Serving consistency (Lineage)
@@ -106,14 +117,14 @@ class TrainingOrchestrator:
                     "transformation": f.transformation,
                     "state": f.state
                 })
-            
+
             hash_str = json.dumps(hash_payload, sort_keys=True)
             training_feature_hash = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()
 
             if dataset_version.materialized_data:
                 logger.info(f"Loading materialized Offline Feature Store data for {dataset_name}.")
                 df_features = pd.read_parquet(io.BytesIO(dataset_version.materialized_data))
-                df_raw = pd.read_csv(io.BytesIO(dataset_version.raw_data)) # Needed for target column extraction
+                df_raw = pd.read_csv(io.BytesIO(dataset_version.raw_data))  # Needed for target column extraction
             else:
                 logger.warning(f"Materialized data not found for {dataset_name}. Falling back to on-the-fly transformation.")
                 df_raw = pd.read_csv(io.BytesIO(dataset_version.raw_data))
@@ -121,7 +132,7 @@ class TrainingOrchestrator:
                 df_features = self.feature_transformer.transform(df_raw, features)
 
             target_col = self._select_target_column(df_raw, dataset_name)
-            
+
             feature_names = [f.name for f in features]
             df_features[target_col] = df_raw[target_col]
             df_features.dropna(subset=[target_col], inplace=True)
@@ -198,8 +209,8 @@ class TrainingOrchestrator:
                     await AuditLogger.record(session, AuditEvent(event_name="ARTIFACT_SAVED", component="TrainingOrchestrator", severity="INFO", payload={"model_id": model_id_str, "checksum": checksum}))
 
                     # 5. Explainability & Baseline Profiling
-                    from app.training.explainability import GlobalExplainer
                     from app.monitoring.drift.baseline import BaselineProfiler
+                    from app.training.explainability import GlobalExplainer
 
                     explainer = GlobalExplainer()
                     feat_imp = explainer.compute_feature_importance(ml_model, feature_names)
@@ -278,7 +289,16 @@ class TrainingOrchestrator:
                         await champion_repo.update(current_champion_record, {
                             "model_id": best_candidate.id
                         })
-                        await AuditLogger.record(session, AuditEvent(event_name="CHAMPION_PROMOTED", component="TrainingOrchestrator", severity="INFO", payload={"new_champion": best_candidate.id, "accuracy": best_acc, "previous_champion": current_champion_model.id if current_champion_model else None}))
+                        await AuditLogger.record(session, AuditEvent(
+                            event_name="CHAMPION_PROMOTED",
+                            component="TrainingOrchestrator",
+                            severity="INFO",
+                            payload={
+                                "new_champion": best_candidate.id,
+                                "accuracy": best_acc,
+                                "previous_champion": current_champion_model.id if current_champion_model else None,
+                            },
+                        ))
                         logger.info(f"Champion promoted: {best_candidate.id} outperformed old champion")
                     else:
                         logger.info(f"Candidate {best_candidate.id} ({best_acc:.4f}) failed to beat champion ({current_acc:.4f}). Archived.")

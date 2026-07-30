@@ -5,11 +5,11 @@ Ensures that execution telemetry (success, failures, validation reports,
 and storage metadata) is strongly typed and preserved for upstream audits.
 """
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Any
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-from app.data.validator import ValidationReport
 from app.data.profiler import ProfilingReport
+from app.data.validator import ValidationReport
 
 
 @dataclass

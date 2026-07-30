@@ -1,8 +1,9 @@
 """
 Pydantic contracts for standardized API errors.
 """
+from typing import Any, Optional
+
 from pydantic import BaseModel
-from typing import Optional, Any
 
 
 class ErrorDetail(BaseModel):

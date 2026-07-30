@@ -1,11 +1,7 @@
 """
 Public API boundary for the Storage Layer.
 """
-from .exceptions import (
-    StorageError,
-    StorageConnectionError,
-    StorageValidationError
-)
+from .exceptions import StorageConnectionError, StorageError, StorageValidationError
 
 __all__ = [
     "StorageError",

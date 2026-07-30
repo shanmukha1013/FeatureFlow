@@ -3,8 +3,8 @@ Configures structured JSON logging globally.
 Integrates context variables to automatically inject correlation IDs into every log statement.
 """
 import contextvars
-import logging
 import json
+import logging
 from datetime import datetime, timezone
 
 # Context variable to hold trace ID across async execution boundaries

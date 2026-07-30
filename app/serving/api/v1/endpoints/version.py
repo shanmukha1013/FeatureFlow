@@ -2,8 +2,9 @@
 Implements the version reporting endpoint.
 """
 from fastapi import APIRouter
-from app.serving.schemas.response import VersionResponseSchema
+
 from app.serving.config import serving_config
+from app.serving.schemas.response import VersionResponseSchema
 
 router = APIRouter()
 

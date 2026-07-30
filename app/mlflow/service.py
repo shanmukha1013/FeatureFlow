@@ -1,18 +1,17 @@
 import os
 import time
-from typing import Dict, Any, Optional
-import pandas as pd
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 import mlflow
+import pandas as pd
 from mlflow.client import MlflowClient
-
+from sqlalchemy import desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import desc
 
 from app.config import settings
-from app.storage.models import Experiment, DatasetVersion
+from app.storage.models import DatasetVersion, Experiment
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -59,7 +58,9 @@ class MLflowService:
                 name=experiment_name,
                 artifact_location=artifact_uri
             )
-            from app.observability.instrumentation import record_mlflow_experiment_created
+            from app.observability.instrumentation import (
+                record_mlflow_experiment_created,
+            )
             record_mlflow_experiment_created()
         else:
             exp_id = exp.experiment_id

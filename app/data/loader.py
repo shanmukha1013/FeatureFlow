@@ -5,12 +5,13 @@ Strictly focuses on locating and safely reading external raw datasets into
 Pandas DataFrames without performing validation or preprocessing.
 """
 import os
-import pandas as pd
 from typing import Protocol
 
+import pandas as pd
+
 from app.config import settings
-from app.utils.logger import get_logger
 from app.data.exceptions import DataLoaderError
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

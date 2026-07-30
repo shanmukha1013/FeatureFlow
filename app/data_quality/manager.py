@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from app.cache.redis_client import RedisClient
 from app.utils.logger import get_logger

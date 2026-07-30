@@ -4,7 +4,7 @@ FeatureMaterializationPipeline: Orchestrates the full ML pipeline.
 Discovers datasets, validates, profiles, engineers features, trains models,
 and tracks experiments - all within PostgreSQL-backed transactions.
 """
-from typing import Optional, List
+from typing import List, Optional
 
 from app.pipelines.base import BasePipeline
 from app.pipelines.execution_context import PipelineExecutionReport

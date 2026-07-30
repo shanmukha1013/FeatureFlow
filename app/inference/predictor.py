@@ -2,16 +2,17 @@
 Coordinates the end-to-end inference prediction lifecycle.
 """
 import time
-import pandas as pd
-from typing import Optional, List
 from datetime import datetime, timezone
+from typing import List, Optional
 
-from app.inference.base import BasePredictor, BaseModelLoader, BaseInferenceValidator
+import pandas as pd
+
+from app.inference.base import BaseInferenceValidator, BaseModelLoader, BasePredictor
+from app.inference.exceptions import InputValidationError, PredictionError
 from app.inference.request import PredictionRequest
 from app.inference.response import PredictionResponse
-from app.inference.exceptions import PredictionError, InputValidationError
+from app.storage.models import Feature, Model
 from app.utils.logger import get_logger
-from app.storage.models import Model, Feature
 
 logger = get_logger(__name__)
 
@@ -64,8 +65,9 @@ class ModelPredictor(BasePredictor):
             try:
                 import hashlib
                 import json
+
                 from app.features.transformer import FeatureTransformer
-                
+
                 # Enforce Training-Serving Consistency Hash Match
                 hash_payload = []
                 for f in self.features_meta:
@@ -75,14 +77,14 @@ class ModelPredictor(BasePredictor):
                         "transformation": f.transformation,
                         "state": getattr(f, 'state', {})
                     })
-                
+
                 hash_str = json.dumps(hash_payload, sort_keys=True)
                 serving_feature_hash = hashlib.sha256(hash_str.encode("utf-8")).hexdigest()
-                
+
                 training_feature_hash = None
                 if self.metadata and self.metadata.metrics:
                     training_feature_hash = self.metadata.metrics.get("training_feature_hash")
-                
+
                 if training_feature_hash and training_feature_hash != serving_feature_hash:
                     # TRAINING-SERVING SKEW DETECTED!
                     msg = f"TRAINING-SERVING SKEW DETECTED for model {self.model_id}. Training hash: {training_feature_hash}, Serving hash: {serving_feature_hash}"
@@ -91,7 +93,7 @@ class ModelPredictor(BasePredictor):
                     self.skew_message = msg
                 else:
                     self.skew_detected = False
-                
+
                 transformed_dict = FeatureTransformer().transform_single(features_dict, self.features_meta)
                 features_dict.update(transformed_dict)
             except Exception as e:
@@ -101,12 +103,12 @@ class ModelPredictor(BasePredictor):
         warnings_list = []
         if getattr(self, 'skew_detected', False):
             warnings_list.append(self.skew_message)
-            
+
         try:
             warnings_list.extend(self.validator.validate(request, self.expected_features))
         except InputValidationError as e:
             if all(f in features_dict for f in self.expected_features):
-                pass # warnings already appended skew
+                pass  # warnings already appended skew
             else:
                 logger.error(f"Validation failure for request '{request.request_id}': {e}")
                 raise

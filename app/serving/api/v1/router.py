@@ -1,6 +1,20 @@
 from fastapi import APIRouter
-from app.serving.api.v1.endpoints import predict, health, models, version, features, model_cache, prediction_cache, explanations, data_quality, monitoring, mlflow
-from app.serving.api.v1.endpoints import redis_observability, api_keys
+
+from app.serving.api.v1.endpoints import (
+    api_keys,
+    data_quality,
+    explanations,
+    features,
+    health,
+    mlflow,
+    model_cache,
+    models,
+    monitoring,
+    predict,
+    prediction_cache,
+    redis_observability,
+    version,
+)
 from app.serving.api.v1.management.router import management_router
 
 v1_router = APIRouter()

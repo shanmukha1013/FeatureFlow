@@ -1,9 +1,19 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import relationship
-from sqlalchemy import JSON
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
+from sqlalchemy.orm import relationship
 
 from app.storage.database import Base
 

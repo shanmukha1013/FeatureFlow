@@ -1,6 +1,7 @@
 from typing import Optional
-from sqlalchemy.ext.asyncio import AsyncSession
+
 import pandas as pd
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data_quality.models import DataContractModel
 from app.data_quality.repositories import DataContractRepository

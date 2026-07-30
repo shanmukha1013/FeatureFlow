@@ -1,8 +1,9 @@
 """
 Partitions datasets into training and testing segments.
 """
-import pandas as pd
 from typing import Tuple
+
+import pandas as pd
 
 from app.training.base import BaseSplitter
 

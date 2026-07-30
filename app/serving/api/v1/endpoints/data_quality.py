@@ -1,13 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
-from app.storage.database import get_db
-from app.data_quality.models import DataContractModel, ValidationRun, ExpectationSuiteModel
-from app.data_quality.schemas import DataContractResponse, ValidationRunResponse
-from app.data_quality.manager import DataQualityCacheManager
-from sqlalchemy.future import select
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+
+from app.data_quality.manager import DataQualityCacheManager
+from app.data_quality.models import (
+    DataContractModel,
+    ExpectationSuiteModel,
+    ValidationRun,
+)
+from app.data_quality.schemas import DataContractResponse, ValidationRunResponse
+from app.storage.database import get_db
 
 router = APIRouter()
 

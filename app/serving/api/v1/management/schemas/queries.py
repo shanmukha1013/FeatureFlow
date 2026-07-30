@@ -1,8 +1,9 @@
 """
 Query schemas for filtering and pagination.
 """
-from pydantic import BaseModel, Field
 from typing import Optional
+
+from pydantic import BaseModel, Field
 
 
 class PaginationQuery(BaseModel):

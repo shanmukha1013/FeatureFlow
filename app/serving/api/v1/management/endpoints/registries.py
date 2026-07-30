@@ -1,15 +1,24 @@
 """
 Exposes read-only access to platform registries.
 """
-from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Any, List
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import desc
 
-from app.storage.database import get_db
-from app.storage.models import Dataset, Feature, Model, Experiment, ChampionModel, AuditLog, DatasetVersion
 from app.serving.api.v1.management.schemas.pagination import PaginatedResponse
+from app.storage.database import get_db
+from app.storage.models import (
+    AuditLog,
+    ChampionModel,
+    Dataset,
+    DatasetVersion,
+    Experiment,
+    Feature,
+    Model,
+)
 
 router = APIRouter()
 
@@ -249,7 +258,7 @@ async def get_experiments(
 
 @router.get("/experiments/compare")
 async def compare_experiments(ids: str = Query(..., description="Comma separated experiment IDs"), session: AsyncSession = Depends(get_db)):
-    from app.monitoring.audit import AuditLogger, AuditEvent
+    from app.monitoring.audit import AuditEvent, AuditLogger
     exp_ids = [e.strip() for e in ids.split(",") if e.strip()]
 
     result = await session.execute(select(Experiment).filter(Experiment.id.in_(exp_ids)))
@@ -305,7 +314,7 @@ async def get_model_explanation(id: str, session: AsyncSession = Depends(get_db)
     model = result.scalars().first()
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
-        
+
     shap_summ = model.metrics.get("shap_summary", {}) if model.metrics else {}
     return {"model_id": id, "shap_summary": shap_summ}
 
@@ -327,7 +336,7 @@ async def get_drift_status(model_id: str = None, session: AsyncSession = Depends
         model_res = await session.execute(select(Model).filter(Model.id == model_id))
         model_record = model_res.scalars().first()
         baseline_profile = model_record.metrics.get("baseline_profile", {}) if model_record and model_record.metrics else {}
-        
+
         report = global_drift_engine.generate_report(model_id, baseline_profile)
 
         from dataclasses import asdict

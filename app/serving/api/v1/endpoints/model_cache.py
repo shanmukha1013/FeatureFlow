@@ -1,14 +1,15 @@
 """
 Implements the Model Registry Cache API endpoints (`Phase 3`).
 """
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, HTTPException, status
+
+from app.cache.model_cache import get_model_registry_cache
 from app.serving.schemas.model_cache import (
+    ModelCacheDeleteResponseSchema,
     ModelCacheGetResponseSchema,
     ModelCacheRefreshResponseSchema,
-    ModelCacheDeleteResponseSchema,
-    ModelCacheStatsSchema
+    ModelCacheStatsSchema,
 )
-from app.cache.model_cache import get_model_registry_cache
 
 router = APIRouter()
 

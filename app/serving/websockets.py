@@ -1,9 +1,10 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from typing import List
 import logging
-from app.events.schema import Event
-from app.events import get_event_bus
+from typing import List
 
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+from app.events import get_event_bus
+from app.events.schema import Event
 
 logger = logging.getLogger(__name__)
 

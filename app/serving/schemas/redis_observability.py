@@ -3,7 +3,8 @@ Pydantic response schemas for Redis Enterprise Observability endpoints (`Phase 5
 
 All fields are live — no hardcoded values. Credentials are always redacted.
 """
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 

@@ -1,13 +1,15 @@
 """
 Exposes telemetry, health, and audit logs.
 """
-from fastapi import APIRouter, Query, Depends
 from typing import Any
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import desc, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import desc, text
-from app.serving.api.v1.management.schemas.pagination import PaginatedResponse
+
 from app.monitoring.health import HealthMonitor
+from app.serving.api.v1.management.schemas.pagination import PaginatedResponse
 from app.storage.database import get_db
 
 router = APIRouter()

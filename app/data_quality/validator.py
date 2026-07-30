@@ -1,8 +1,9 @@
 import great_expectations as gx
 import pandas as pd
-
 from great_expectations.core.expectation_suite import ExpectationSuite
-from great_expectations.core.expectation_validation_result import ExpectationSuiteValidationResult
+from great_expectations.core.expectation_validation_result import (
+    ExpectationSuiteValidationResult,
+)
 
 
 class GXEphemeralValidator:

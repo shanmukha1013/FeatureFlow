@@ -6,6 +6,7 @@ This is NOT a metadata store - that is PostgreSQL.
 This is purely the in-memory index of model_id -> predictor for fast routing.
 """
 from typing import Dict, Optional
+
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

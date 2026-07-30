@@ -1,10 +1,12 @@
 import time
+from typing import Any, Dict, Tuple
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Tuple
-from app.utils.logger import get_logger
+
 from app.explainability.utils import get_explainer_for_model
 from app.inference.exceptions import InferenceError
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

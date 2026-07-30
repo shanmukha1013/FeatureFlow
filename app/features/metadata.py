@@ -5,7 +5,7 @@ Strictly defines the metadata contract required for every feature, enabling
 registry indexing, searchability, and safe transformation dependencies.
 """
 from dataclasses import dataclass, field
-from typing import List, Optional, Any
+from typing import Any, List, Optional
 
 
 @dataclass(frozen=True)

@@ -5,10 +5,9 @@ Ensures that logs are formatted consistently across modules and respect
 the globally configured logging level.
 """
 import logging
+import os
 import sys
 from typing import Optional
-
-import os
 
 _LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - [%(funcName)s] %(message)s"
 _DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"

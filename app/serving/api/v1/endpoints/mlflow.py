@@ -1,19 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.events import get_event_bus
-from app.events.schema import Event, EventType, EventSeverity
-
-
-from app.storage.database import get_db
+from app.events.schema import Event, EventSeverity, EventType
 from app.mlflow.schemas import (
-    MLflowTrainRequest,
-    MLflowTrainResponse,
+    MLflowModelResponse,
     MLflowPromoteRequest,
     MLflowPromoteResponse,
     MLflowRunResponse,
-    MLflowModelResponse
+    MLflowTrainRequest,
+    MLflowTrainResponse,
 )
 from app.mlflow.service import MLflowService
+from app.storage.database import get_db
 
 router = APIRouter(prefix="/mlflow", tags=["mlflow"])
 

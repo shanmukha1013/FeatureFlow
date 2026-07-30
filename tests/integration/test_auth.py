@@ -1,7 +1,8 @@
 import uuid
+
+import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-import pytest
 
 pytestmark = pytest.mark.integration
 
@@ -12,8 +13,9 @@ pytestmark = pytest.mark.integration
 
 @pytest_asyncio.fixture(scope="function")
 async def async_client():
-    from app.serving.main import app
     from httpx import ASGITransport
+
+    from app.serving.main import app
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
 

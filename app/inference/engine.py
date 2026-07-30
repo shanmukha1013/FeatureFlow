@@ -1,23 +1,23 @@
-import pandas as pd
-from typing import Dict, List, Any, Optional
-from io import StringIO
-from datetime import datetime, timezone
-import uuid
 import os
+import uuid
+from datetime import datetime, timezone
+from io import StringIO
+from typing import Any, Dict, List, Optional
+
 import joblib
+import pandas as pd
 from sqlalchemy.future import select
 
-from app.utils.logger import get_logger
-
-from app.inference.predictor import ModelPredictor
 from app.inference.exceptions import InferenceError, PredictionError
+from app.inference.predictor import ModelPredictor
 from app.inference.request import PredictionRequest
 from app.inference.response import PredictionResponse
 from app.inference.validator import RequestValidator
-from app.training.artifacts import LocalArtifactStore
-from app.monitoring.audit import AuditLogger, AuditEvent
+from app.monitoring.audit import AuditEvent, AuditLogger
 from app.storage.database import AsyncSessionLocal
 from app.storage.repositories.core import ChampionModelRepository, ModelRepository
+from app.training.artifacts import LocalArtifactStore
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -83,13 +83,14 @@ class PredictionEngine:
             for meta in active_models:
                 try:
                     # Fetch features for this dataset
-                    from app.storage.models import Feature
                     from sqlalchemy.orm import selectinload
+
+                    from app.storage.models import Feature
                     feature_result = await session.execute(
                         select(Feature).options(selectinload(Feature.dataset)).filter(Feature.dataset_id == meta.dataset_id)
                     )
                     all_features_meta = feature_result.scalars().all()
-                    
+
                     # Filter to only the features seen during training
                     if meta.feature_lineage:
                         lineage_names = {f.get("name") for f in meta.feature_lineage if isinstance(f, dict)}
@@ -276,10 +277,14 @@ class PredictionEngine:
                             timestamp=request.timestamp
                         )
                         logger.info(f"Using online feature vector (source: {source}) for entity {request.entity_id}.")
-                        
+
                         try:
                             from app.events import get_event_bus
-                            from app.events.schema import Event, EventType, EventSeverity
+                            from app.events.schema import (
+                                Event,
+                                EventSeverity,
+                                EventType,
+                            )
                             bus = get_event_bus()
                             if bus:
                                 await bus.publish(Event(
@@ -306,11 +311,11 @@ class PredictionEngine:
                         if "TRAINING-SERVING SKEW DETECTED" in warning:
                             async with AsyncSessionLocal() as session:
                                 await AuditLogger.record(
-                                    session, 
+                                    session,
                                     AuditEvent(
-                                        event_name="TRAINING_SERVING_SKEW", 
-                                        component="PredictionEngine", 
-                                        severity="WARNING", 
+                                        event_name="TRAINING_SERVING_SKEW",
+                                        component="PredictionEngine",
+                                        severity="WARNING",
                                         payload={
                                             "model_id": model_id,
                                             "request_id": request.request_id,
@@ -319,10 +324,14 @@ class PredictionEngine:
                                     )
                                 )
                                 await session.commit()
-                                
+
                             try:
                                 from app.events import get_event_bus
-                                from app.events.schema import Event, EventType, EventSeverity
+                                from app.events.schema import (
+                                    Event,
+                                    EventSeverity,
+                                    EventType,
+                                )
                                 bus = get_event_bus()
                                 if bus:
                                     await bus.publish(Event(
@@ -455,10 +464,14 @@ class PredictionEngine:
         object.__setattr__(req, "background_tasks", background_tasks)
         object.__setattr__(req, "user_id", user_id)
 
-        from app.observability.instrumentation import record_prediction, record_prediction_failure
-        from app.events import get_event_bus
-        from app.events.schema import Event, EventType, EventSeverity
         import time
+
+        from app.events import get_event_bus
+        from app.events.schema import Event, EventSeverity, EventType
+        from app.observability.instrumentation import (
+            record_prediction,
+            record_prediction_failure,
+        )
         start_time = time.time()
         try:
             res = await self._execute_predict(req, alias)

@@ -4,8 +4,8 @@ Provides schema definitions for dataset structures.
 Ensures that incoming datasets adhere to strict contracts regarding
 required columns and data types before downstream processing.
 """
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 from app.utils.logger import get_logger
 

@@ -12,7 +12,7 @@ Implements Phase 2 requirements:
 """
 import asyncio
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from app.cache.cache_manager import CacheManager, get_cache_manager
 from app.config import settings
@@ -180,7 +180,10 @@ class OnlineFeatureStore:
         """
         try:
             from app.storage.database import AsyncSessionLocal
-            from app.storage.repositories.core import FeatureValueRepository, DatasetRepository
+            from app.storage.repositories.core import (
+                DatasetRepository,
+                FeatureValueRepository,
+            )
 
             async with AsyncSessionLocal() as session:
                 # Resolve dataset ID if dataset parameter is a name

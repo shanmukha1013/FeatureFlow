@@ -1,8 +1,9 @@
 """
 Pydantic contracts for outgoing API responses.
 """
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
-from typing import Any, List, Optional, Dict
 
 
 class PredictResponseSchema(BaseModel):

@@ -1,8 +1,9 @@
 """
 Pydantic contracts for Online Feature Store endpoints.
 """
+from typing import Any, Dict, List, Optional, Union
+
 from pydantic import BaseModel
-from typing import Dict, Any, Optional, List, Union
 
 
 class StoreFeatureRequestSchema(BaseModel):

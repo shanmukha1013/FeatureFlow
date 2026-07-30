@@ -8,10 +8,10 @@ as the authoritative System of Record.
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-from app.cache.redis_client import RedisClient
 from app.cache.cache_manager import CacheManager
+from app.cache.redis_client import RedisClient
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -188,9 +188,10 @@ class ModelRegistryCache:
 
         # Fallback to PostgreSQL
         try:
-            from app.storage.database import AsyncSessionLocal
-            from sqlalchemy.orm import selectinload
             from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+
+            from app.storage.database import AsyncSessionLocal
             from app.storage.models import Model
 
             async def _fetch(sess):
@@ -244,11 +245,12 @@ class ModelRegistryCache:
 
         # Fallback to PostgreSQL
         try:
-            from app.storage.database import AsyncSessionLocal
-            from app.storage.repositories.core import DatasetRepository
-            from sqlalchemy.orm import selectinload
             from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+
+            from app.storage.database import AsyncSessionLocal
             from app.storage.models import ChampionModel
+            from app.storage.repositories.core import DatasetRepository
 
             async def _fetch(sess):
                 ds_repo = DatasetRepository(sess)
@@ -311,10 +313,11 @@ class ModelRegistryCache:
             return cached, "redis"
 
         try:
-            from app.storage.database import AsyncSessionLocal
             from sqlalchemy import select
             from sqlalchemy.orm import selectinload
-            from app.storage.models import Model, ModelVersion, Feature, Experiment
+
+            from app.storage.database import AsyncSessionLocal
+            from app.storage.models import Experiment, Feature, Model, ModelVersion
 
             async def _fetch(sess):
                 # 1. Fetch Model
@@ -430,10 +433,17 @@ class ModelRegistryCache:
     async def refresh_all_caches(self) -> Dict[str, Any]:
         """Queries all active models and champions from PostgreSQL and refreshes all cache entries concurrently."""
         try:
-            from app.storage.database import AsyncSessionLocal
             from sqlalchemy import select
             from sqlalchemy.orm import selectinload
-            from app.storage.models import Model, ChampionModel, ModelVersion, Feature, Experiment
+
+            from app.storage.database import AsyncSessionLocal
+            from app.storage.models import (
+                ChampionModel,
+                Experiment,
+                Feature,
+                Model,
+                ModelVersion,
+            )
 
             refreshed_models = 0
             refreshed_champions = 0

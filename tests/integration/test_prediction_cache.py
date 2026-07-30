@@ -1,15 +1,17 @@
-from app.storage.repositories.core import (
-    DatasetRepository,
-    ModelRepository,
-    ChampionModelRepository
-)
-from app.storage.database import AsyncSessionLocal
+import asyncio
+import uuid
+
+import pytest
+import pytest_asyncio
+
 from app.cache.prediction_cache import PredictionCache, get_prediction_cache
 from app.cache.redis_client import RedisClient
-import pytest_asyncio
-import uuid
-import asyncio
-import pytest
+from app.storage.database import AsyncSessionLocal
+from app.storage.repositories.core import (
+    ChampionModelRepository,
+    DatasetRepository,
+    ModelRepository,
+)
 
 pytestmark = pytest.mark.integration
 

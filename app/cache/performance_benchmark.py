@@ -12,11 +12,11 @@ All test keys are cleaned up after each benchmark run.
 """
 import time
 import uuid
-from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-from app.utils.logger import get_logger
 from app.config import settings
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

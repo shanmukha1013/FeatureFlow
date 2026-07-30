@@ -2,10 +2,11 @@
 Implements the health check endpoint for Kubernetes liveness/readiness probes.
 """
 from fastapi import APIRouter, Depends
-from app.serving.schemas.response import HealthResponseSchema, RedisHealthResponseSchema
+
+from app.cache import get_cache_manager
 from app.serving.config import serving_config
 from app.serving.dependencies import get_prediction_engine
-from app.cache import get_cache_manager
+from app.serving.schemas.response import HealthResponseSchema, RedisHealthResponseSchema
 
 router = APIRouter()
 
@@ -24,11 +25,12 @@ async def readiness_probe(engine=Depends(get_prediction_engine)):
     Verifies that the API server is ready to receive requests.
     Checks PostgreSQL, Redis, and MLflow connectivity.
     """
-    from fastapi.responses import JSONResponse
-    from app.storage.database import AsyncSessionLocal
-    from sqlalchemy import text
-    from app.cache import RedisClient
     import mlflow
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import text
+
+    from app.cache import RedisClient
+    from app.storage.database import AsyncSessionLocal
 
     is_ready = True
     reasons = []

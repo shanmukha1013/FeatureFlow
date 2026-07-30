@@ -1,5 +1,8 @@
 from typing import Dict, Tuple
-from great_expectations.core.expectation_validation_result import ExpectationSuiteValidationResult
+
+from great_expectations.core.expectation_validation_result import (
+    ExpectationSuiteValidationResult,
+)
 
 
 class QualityGate:

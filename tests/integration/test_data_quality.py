@@ -1,9 +1,11 @@
-from app.storage.models import Dataset, DatasetVersion
-from app.storage.database import AsyncSessionLocal
-from app.data_quality.service import DataQualityService
 import uuid
+
 import pandas as pd
 import pytest
+
+from app.data_quality.service import DataQualityService
+from app.storage.database import AsyncSessionLocal
+from app.storage.models import Dataset, DatasetVersion
 
 pytestmark = pytest.mark.integration
 
@@ -40,7 +42,10 @@ async def test_data_quality_service_baseline_creation():
         from app.data_quality.repositories import ExpectationSuiteRepository
         suite_repo = ExpectationSuiteRepository(session)
 
-        from app.data_quality.repositories import DataContractRepository, ValidationRunRepository
+        from app.data_quality.repositories import (
+            DataContractRepository,
+            ValidationRunRepository,
+        )
         contract_repo = DataContractRepository(session)
         contract = await contract_repo.get_by_dataset(dataset_name)
         assert contract is not None

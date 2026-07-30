@@ -1,8 +1,10 @@
-import numpy as np
-from typing import Dict, Any, List
+from collections import deque
 from datetime import datetime, timezone
 from threading import Lock
-from collections import deque
+from typing import Any, Dict, List
+
+import numpy as np
+
 from app.monitoring.drift.metadata import DriftReport, DriftSeverity
 from app.utils.logger import get_logger
 

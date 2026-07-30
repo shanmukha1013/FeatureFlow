@@ -3,13 +3,13 @@ Implements the Online Feature Store endpoints for serving real-time feature vect
 """
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.serving.schemas.features import (
-    StoreFeatureRequestSchema,
-    StoreFeatureBatchRequestSchema,
-    RefreshFeatureRequestSchema,
-    FeatureVectorResponseSchema
-)
 from app.cache.online_store import get_online_store
+from app.serving.schemas.features import (
+    FeatureVectorResponseSchema,
+    RefreshFeatureRequestSchema,
+    StoreFeatureBatchRequestSchema,
+    StoreFeatureRequestSchema,
+)
 
 router = APIRouter()
 

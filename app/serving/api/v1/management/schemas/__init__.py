@@ -4,8 +4,11 @@ Exports schemas for management API.
 from .pagination import PaginatedResponse
 from .queries import PaginationQuery
 from .responses import (
-    PlatformOverviewSchema, SystemInfoSchema, StatisticsSchema,
-    AboutSchema, ConfigSchema
+    AboutSchema,
+    ConfigSchema,
+    PlatformOverviewSchema,
+    StatisticsSchema,
+    SystemInfoSchema,
 )
 
 __all__ = [

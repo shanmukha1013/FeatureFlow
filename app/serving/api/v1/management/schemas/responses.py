@@ -1,8 +1,9 @@
 """
 Pydantic schemas for Management API responses.
 """
-from pydantic import BaseModel
 from typing import List
+
+from pydantic import BaseModel
 
 
 class PlatformOverviewSchema(BaseModel):

@@ -19,9 +19,9 @@ try:
 except ImportError:
     pass
 
-import sys
 if "litestar" not in sys.modules:
     from unittest.mock import MagicMock
+
     class DummyMock(MagicMock):
         pass
     mock_litestar = DummyMock()
@@ -33,40 +33,44 @@ if "litestar" not in sys.modules:
     sys.modules["litestar._asgi"] = mock_litestar
     sys.modules["litestar.types"] = mock_litestar
 
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.serving.config import serving_config
-from app.serving.api.v1.router import v1_router
+from app.config import settings
+from app.inference.exceptions import (
+    InferenceError,
+    InputValidationError,
+    ModelLoadError,
+    PredictionError,
+)
 from app.monitoring.middleware import monitoring_middleware
+from app.observability.instrumentation import collect_system_metrics
+from app.observability.middleware import ObservabilityMiddleware
+from app.serving.api.v1.router import v1_router
+from app.serving.config import serving_config
 from app.serving.exceptions import (
-    validation_error_handler,
+    internal_error_handler,
     not_found_error_handler,
     service_unavailable_handler,
-    internal_error_handler
+    validation_error_handler,
 )
-from app.inference.exceptions import InputValidationError, ModelLoadError, InferenceError, PredictionError
-from app.observability.middleware import ObservabilityMiddleware
-from app.observability.instrumentation import collect_system_metrics
-
-from contextlib import asynccontextmanager
-import asyncio
-
 from app.utils.logger import get_logger
-from app.config import settings
 
 logger = get_logger(__name__)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from app.storage.database import init_db
     from app.cache import RedisClient
     from app.cache.health_monitor import get_health_monitor
-    from app.events.bus import EventBus
-    from app.events import set_event_bus
     from app.cache.recovery_manager import get_recovery_manager
-    from app.monitoring.audit import AuditLogger, AuditEvent
-    from app.storage.database import AsyncSessionLocal
+    from app.events import set_event_bus
+    from app.events.bus import EventBus
+    from app.monitoring.audit import AuditEvent, AuditLogger
+    from app.storage.database import AsyncSessionLocal, init_db
 
     # Initialize Database connection and create tables
     await init_db()
@@ -81,6 +85,7 @@ async def lifespan(app: FastAPI):
     # Phase 13A: Startup Validation
     async def validate_startup():
         import os
+
         import mlflow
 
         # 1. PostgreSQL — mandatory, app cannot function without it
@@ -169,11 +174,11 @@ async def lifespan(app: FastAPI):
     metrics_task.cancel()
     # Phase 5: Stop background services gracefully
     from app.events import get_event_bus
-    
+
     event_bus = get_event_bus()
     if event_bus:
         await event_bus.stop()
-        
+
     await health_monitor.stop() if health_monitor else None
     await recovery_manager.stop() if recovery_manager else None
 
@@ -243,8 +248,8 @@ FeatureFlow is a production-grade ML platform for feature management, real-time 
     app.include_router(websockets_router)
 
     # Register metrics endpoint
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
     from fastapi import Response
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
     @app.get("/metrics", tags=["observability"])
     def metrics():

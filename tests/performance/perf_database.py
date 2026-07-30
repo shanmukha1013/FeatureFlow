@@ -1,10 +1,12 @@
-from app.utils.logger import get_logger
-from app.storage.models import AuditLog, SystemMetric, Feature, Dataset
-from app.storage.database import AsyncSessionLocal, engine
-from sqlalchemy import text
-import time
 import asyncio
+import time
+
 import pytest
+from sqlalchemy import text
+
+from app.storage.database import AsyncSessionLocal, engine
+from app.storage.models import AuditLog, Dataset, Feature, SystemMetric
+from app.utils.logger import get_logger
 
 pytestmark = pytest.mark.performance
 

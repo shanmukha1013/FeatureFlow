@@ -1,12 +1,13 @@
 """
 Validates prediction requests before execution.
 """
-import pandas as pd
 from typing import List
 
+import pandas as pd
+
 from app.inference.base import BaseInferenceValidator
-from app.inference.request import PredictionRequest
 from app.inference.exceptions import InputValidationError
+from app.inference.request import PredictionRequest
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

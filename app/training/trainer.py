@@ -1,8 +1,9 @@
 """
 Executes ML algorithms on prepared features.
 """
-import pandas as pd
 from typing import Any
+
+import pandas as pd
 
 from app.training.base import BaseTrainer
 from app.training.exceptions import TrainingFailure
@@ -29,8 +30,12 @@ class LogisticRegressionTrainer(BaseTrainer):
         return "LogisticRegression"
 
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
-        from app.observability.instrumentation import record_training_success, record_training_failure
         import time
+
+        from app.observability.instrumentation import (
+            record_training_failure,
+            record_training_success,
+        )
         start_time = time.time()
         logger.info(f"Commencing training sequence for {self.algorithm_name}.")
         try:
@@ -63,8 +68,12 @@ class RandomForestTrainer(BaseTrainer):
         return "RandomForest"
 
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
-        from app.observability.instrumentation import record_training_success, record_training_failure
         import time
+
+        from app.observability.instrumentation import (
+            record_training_failure,
+            record_training_success,
+        )
         start_time = time.time()
         logger.info(f"Commencing training sequence for {self.algorithm_name}.")
         try:
@@ -97,8 +106,12 @@ class DecisionTreeTrainer(BaseTrainer):
         return "DecisionTree"
 
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> Any:
-        from app.observability.instrumentation import record_training_success, record_training_failure
         import time
+
+        from app.observability.instrumentation import (
+            record_training_failure,
+            record_training_success,
+        )
         start_time = time.time()
         logger.info(f"Commencing training sequence for {self.algorithm_name}.")
         try:

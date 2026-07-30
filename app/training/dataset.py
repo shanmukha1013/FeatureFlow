@@ -5,8 +5,9 @@ Strictly isolates X (features) and Y (target) without leaking Data Layer
 preprocessing or Feature Layer engineering logic. Implements defensive checks
 to prevent data leakage and guarantee training integrity.
 """
+from typing import List, Optional, Tuple
+
 import pandas as pd
-from typing import List, Tuple, Optional
 
 from app.training.exceptions import DatasetPreparationError
 from app.utils.logger import get_logger
@@ -69,8 +70,8 @@ class TrainingDatasetBuilder:
         y = df[target_column]
 
         # Impute missing values in features
-        from sklearn.impute import SimpleImputer
         import pandas as pd
+        from sklearn.impute import SimpleImputer
 
         imputer = SimpleImputer(strategy='median')
         try:

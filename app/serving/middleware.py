@@ -1,9 +1,11 @@
 """
 Defines middleware for the FastAPI application.
 """
-import uuid
 import time
+import uuid
+
 from fastapi import Request
+
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

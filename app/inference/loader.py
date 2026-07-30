@@ -5,8 +5,8 @@ Acts as the bridge between the persisted artifact on disk and the in-memory
 ModelPredictor at inference time.
 """
 from app.inference.base import BaseModelLoader
-from app.training.artifacts import LocalArtifactStore
 from app.inference.exceptions import ModelLoadError
+from app.training.artifacts import LocalArtifactStore
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

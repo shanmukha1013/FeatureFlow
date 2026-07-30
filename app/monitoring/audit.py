@@ -1,8 +1,10 @@
 import uuid
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.monitoring.config import monitoring_config
 
 

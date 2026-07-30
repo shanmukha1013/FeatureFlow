@@ -1,11 +1,14 @@
-import pandas as pd
-import numpy as np
 from typing import Any
+
+import numpy as np
+import pandas as pd
+
 from app.features.feature import BaseFeature
 
 # =======================
 # NUMERIC TRANSFORMATIONS
 # =======================
+
 
 class PassthroughFeature(BaseFeature):
     def fit(self, df: pd.DataFrame) -> dict:
@@ -18,7 +21,6 @@ class PassthroughFeature(BaseFeature):
     def transform_single(self, data: dict) -> Any:
         col = self.metadata.source_columns[0]
         return data.get(col)
-
 
 
 class StandardScalerFeature(BaseFeature):

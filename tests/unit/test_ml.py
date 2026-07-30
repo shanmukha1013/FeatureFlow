@@ -1,13 +1,15 @@
+import os
 from unittest.mock import AsyncMock
-from app.inference.exceptions import InferenceError, PredictionError
+
+import numpy as np
+import pandas as pd
+import pytest
+
 from app.inference.engine import PredictionEngine
+from app.inference.exceptions import InferenceError, PredictionError
 from app.training.artifacts import LocalArtifactStore
 from app.training.evaluator import ClassificationEvaluator
 from app.training.trainer import LogisticRegressionTrainer, RandomForestTrainer
-import numpy as np
-import pandas as pd
-import os
-import pytest
 
 pytestmark = pytest.mark.unit
 
@@ -22,6 +24,10 @@ def mock_audit_logger(monkeypatch):
     monkeypatch.setattr("app.inference.engine.AuditLogger.record", AsyncMock())
     # Also mock model_cache database fallback
     monkeypatch.setattr("app.cache.model_cache.get_model_registry_cache", AsyncMock())
+    # Prevent engine.start() from connecting to PostgreSQL in unit tests.
+    # Without this, start() loads real DB models which act as fallback predictors,
+    # causing tests that expect InferenceError to silently succeed via fallback.
+    monkeypatch.setattr("app.inference.engine.PredictionEngine.start", AsyncMock())
 
 
 @pytest.fixture

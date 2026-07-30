@@ -1,14 +1,16 @@
-from httpx import AsyncClient
 import asyncio
+
 import pytest
+from httpx import AsyncClient
 
 pytestmark = pytest.mark.performance
 
 
 @pytest.mark.asyncio
 async def test_auth_rate_limiting():
-    from app.serving.main import app
     from httpx import ASGITransport
+
+    from app.serving.main import app
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Rate limit should trigger if we do 6 requests in quick succession
         username = "rate_limit_test"

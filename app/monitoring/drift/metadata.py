@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Any, List
 from enum import Enum
+from typing import Any, Dict, List
 
 
 class DriftSeverity(str, Enum):

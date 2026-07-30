@@ -1,17 +1,30 @@
 import time
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from app.utils.logger import get_logger
-from app.monitoring.audit import AuditLogger, AuditEvent
 from app.features.builtin_transformers import (
-    StandardScalerFeature, MinMaxFeature, RobustScalerFeature, LogTransformFeature, NormalizationFeature,
-    LabelEncodingFeature, FrequencyEncodingFeature, OneHotEncodingFeature,
-    DatetimeYearFeature, DatetimeMonthFeature, DatetimeDayFeature, DatetimeHourFeature,
-    DatetimeWeekdayFeature, DatetimeWeekendFeature, DatetimeQuarterFeature,
     BinaryConversionFeature,
-    TextLengthFeature, TextWordCountFeature, TextCharacterCountFeature,
-    PassthroughFeature
+    DatetimeDayFeature,
+    DatetimeHourFeature,
+    DatetimeMonthFeature,
+    DatetimeQuarterFeature,
+    DatetimeWeekdayFeature,
+    DatetimeWeekendFeature,
+    DatetimeYearFeature,
+    FrequencyEncodingFeature,
+    LabelEncodingFeature,
+    LogTransformFeature,
+    MinMaxFeature,
+    NormalizationFeature,
+    OneHotEncodingFeature,
+    PassthroughFeature,
+    RobustScalerFeature,
+    StandardScalerFeature,
+    TextCharacterCountFeature,
+    TextLengthFeature,
+    TextWordCountFeature,
 )
+from app.monitoring.audit import AuditEvent, AuditLogger
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -97,6 +110,7 @@ class FeatureEngineeringEngine:
 
                 # Check for existing feature in DB
                 from sqlalchemy.future import select
+
                 from app.storage.models import Feature
                 existing = await session.execute(
                     select(Feature).filter(Feature.dataset_id == dataset_record.id, Feature.name == feat_name)

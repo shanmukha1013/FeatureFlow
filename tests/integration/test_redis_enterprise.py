@@ -1,15 +1,17 @@
-from app.storage.database import AsyncSessionLocal
+import uuid
+
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+
+from app.cache.health_monitor import RedisHealthMonitor, get_health_monitor
 from app.cache.model_cache import ModelRegistryCache
 from app.cache.online_store import OnlineFeatureStore
-from app.cache.prediction_cache import get_prediction_cache, PredictionCache
 from app.cache.performance_benchmark import get_benchmark
-from app.cache.recovery_manager import get_recovery_manager, RedisRecoveryManager
-from app.cache.health_monitor import get_health_monitor, RedisHealthMonitor
+from app.cache.prediction_cache import PredictionCache, get_prediction_cache
+from app.cache.recovery_manager import RedisRecoveryManager, get_recovery_manager
 from app.cache.redis_client import RedisClient
-from httpx import AsyncClient, ASGITransport
-import pytest_asyncio
-import uuid
-import pytest
+from app.storage.database import AsyncSessionLocal
 
 pytestmark = pytest.mark.integration
 
@@ -264,9 +266,10 @@ async def test_audit_log_redis_connected_event_recorded():
     Verify that the REDIS_CONNECTED audit event is persisted to PostgreSQL.
     Emits one programmatically and reads it back from the DB.
     """
-    from app.monitoring.audit import AuditLogger, AuditEvent
-    from app.storage.models import AuditLog
     from sqlalchemy.future import select
+
+    from app.monitoring.audit import AuditEvent, AuditLogger
+    from app.storage.models import AuditLog
 
     run_id = uuid.uuid4().hex[:8]
     event = AuditEvent(
@@ -305,9 +308,10 @@ async def test_audit_log_redis_reconnected_event():
     """
     Simulates REDIS_RECONNECTED audit event and verifies it is stored in PostgreSQL.
     """
-    from app.monitoring.audit import AuditLogger, AuditEvent
-    from app.storage.models import AuditLog
     from sqlalchemy.future import select
+
+    from app.monitoring.audit import AuditEvent, AuditLogger
+    from app.storage.models import AuditLog
 
     run_id = uuid.uuid4().hex[:8]
     async with AsyncSessionLocal() as session:

@@ -12,25 +12,26 @@ Routes:
   GET /redis/memory       — Memory usage, fragmentation, eviction policy, alerts
   POST /redis/performance/run  — Trigger a fresh benchmark run
 """
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
 from datetime import datetime, timezone
+from typing import Optional
 
+from fastapi import APIRouter, HTTPException, Query
+
+from app.config import settings
 from app.serving.schemas.redis_observability import (
-    RedisStatisticsResponse,
-    RedisHealthResponse,
-    RedisPerformanceResponse,
-    RedisConnectionsResponse,
-    RedisMemoryResponse,
-    RedisKeyspaceSchema,
-    RedisServerStatsSchema,
+    LatencyStatsSchema,
+    RedisClientInternalStatsSchema,
     RedisClientStatsSchema,
     RedisConnectionPoolSchema,
-    RedisClientInternalStatsSchema,
+    RedisConnectionsResponse,
+    RedisHealthResponse,
+    RedisKeyspaceSchema,
+    RedisMemoryResponse,
     RedisMemorySchema,
-    LatencyStatsSchema,
+    RedisPerformanceResponse,
+    RedisServerStatsSchema,
+    RedisStatisticsResponse,
 )
-from app.config import settings
 from app.utils.logger import get_logger
 
 router = APIRouter(prefix="/redis", tags=["redis_observability"])
@@ -101,10 +102,11 @@ async def get_redis_health():
     Returns comprehensive Redis health: ping latency, client count, pool utilization, recovery state.
     Triggers a live ping to always return fresh latency data.
     """
-    from app.cache.redis_client import RedisClient
+    import time
+
     from app.cache.health_monitor import get_health_monitor
     from app.cache.recovery_manager import get_recovery_manager
-    import time
+    from app.cache.redis_client import RedisClient
 
     redis = await RedisClient.get_instance()
     monitor = await get_health_monitor()
@@ -215,9 +217,9 @@ async def get_redis_connections():
     """
     Returns live connection pool utilization, client counts, and recovery manager status.
     """
-    from app.cache.redis_client import RedisClient
     from app.cache.health_monitor import get_health_monitor
     from app.cache.recovery_manager import get_recovery_manager
+    from app.cache.redis_client import RedisClient
 
     redis = await RedisClient.get_instance()
     monitor = await get_health_monitor()
@@ -256,8 +258,8 @@ async def get_redis_memory():
     """
     Returns live Redis memory usage, peak, fragmentation, eviction policy, and alert status.
     """
-    from app.cache.redis_client import RedisClient
     from app.cache.health_monitor import get_health_monitor
+    from app.cache.redis_client import RedisClient
 
     redis = await RedisClient.get_instance()
     monitor = await get_health_monitor()

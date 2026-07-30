@@ -5,8 +5,9 @@ Decouples the orchestration of training from the underlying implementations
 of data splitting, model algorithms, and metric evaluation.
 """
 from abc import ABC, abstractmethod
+from typing import Any, Dict, Tuple
+
 import pandas as pd
-from typing import Tuple, Dict, Any
 
 
 class BaseSplitter(ABC):

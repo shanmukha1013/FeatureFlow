@@ -5,11 +5,12 @@ Forces all analytical logic to adhere to a strict object-oriented interface,
 guaranteeing self-validation and execution safety during transformation.
 """
 from abc import ABC, abstractmethod
-import pandas as pd
-from typing import List
+from typing import Any, List
 
+import pandas as pd
+
+from app.features.exceptions import FeatureTransformationError, InvalidFeatureError
 from app.features.metadata import FeatureMetadata
-from app.features.exceptions import InvalidFeatureError, FeatureTransformationError
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -55,10 +56,10 @@ class BaseFeature(ABC):
     def fit(self, df: pd.DataFrame) -> dict:
         """
         Computes feature statistics (mean, std, vocab) required for transformation.
-        
+
         Args:
             df: Validated DataFrame.
-            
+
         Returns:
             A dictionary containing the state.
         """
@@ -76,16 +77,16 @@ class BaseFeature(ABC):
             A Pandas Series corresponding precisely to the input row dimensions.
         """
         ...
-        
+
     @abstractmethod
     def transform_single(self, data: dict) -> Any:
         """
         High-performance business logic for computing the feature for a single online request.
         Uses self.metadata.state.
-        
+
         Args:
             data: Raw dictionary from online inference request.
-            
+
         Returns:
             A single primitive value.
         """

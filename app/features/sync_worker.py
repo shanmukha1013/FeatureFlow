@@ -1,15 +1,16 @@
-import asyncio
-from typing import Dict, Any
+from typing import Any, Dict
 
-from app.utils.logger import get_logger
-from app.events.schema import Event, EventType, EventSeverity
-from app.events.bus import EventBus
-from app.storage.database import AsyncSessionLocal
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from app.storage.models import FeatureValue, Feature
+
+from app.events.bus import EventBus
+from app.events.schema import Event, EventSeverity, EventType
+from app.storage.database import AsyncSessionLocal
+from app.storage.models import Feature, FeatureValue
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
 
 class OnlineStoreSyncWorker:
     """
@@ -23,9 +24,9 @@ class OnlineStoreSyncWorker:
     async def handle_sync(self, event: Event):
         dataset_id = event.payload.get("dataset_id")
         dataset_name = event.payload.get("dataset_name")
-        
+
         logger.info(f"[SyncWorker] Received FEATURE_VALUES_CREATED for dataset {dataset_name}. Starting sync to Online Store.")
-        
+
         try:
             async with AsyncSessionLocal() as session:
                 # Query all FeatureValues for this dataset
@@ -36,11 +37,11 @@ class OnlineStoreSyncWorker:
                     .filter(Feature.dataset_id == dataset_id, FeatureValue.status != 'ARCHIVED')
                 )
                 feature_values = result.scalars().all()
-                
+
                 if not feature_values:
                     logger.warning(f"[SyncWorker] No FeatureValues found for dataset {dataset_name} in PostgreSQL.")
                     return
-                
+
                 # Repackage by entity_id
                 entity_features_map: Dict[str, Dict[str, Any]] = {}
                 for fv in feature_values:
@@ -48,7 +49,7 @@ class OnlineStoreSyncWorker:
                         entity_id = fv.entity_id
                         if entity_id not in entity_features_map:
                             entity_features_map[entity_id] = {}
-                        
+
                         val = fv.value_json
                         if isinstance(val, dict) and "value" in val:
                             entity_features_map[entity_id][fv.feature.name] = val["value"]
@@ -58,16 +59,16 @@ class OnlineStoreSyncWorker:
                 # Call OnlineFeatureStore to do batch store
                 from app.cache.online_store import get_online_store
                 online_store = get_online_store()
-                
+
                 await online_store.store_online_features_batch(
                     dataset=dataset_id,
                     entity_features_map=entity_features_map,
                     feature_version=1,
                     dataset_version=1
                 )
-                
+
                 logger.info(f"[SyncWorker] Successfully synchronized {len(entity_features_map)} entities to Redis Online Store for dataset {dataset_name}.")
-                
+
                 # Publish event that sync is complete
                 await self.bus.publish(Event(
                     type=EventType.ONLINE_STORE_SYNCED,

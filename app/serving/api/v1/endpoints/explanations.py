@@ -1,20 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from typing import List
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
 
-from app.storage.database import get_db
-from app.storage.models import ExplanationMetadata, GlobalExplanationSummary
-from app.explainability.schemas import (
-    ExplanationResponse,
-    CacheStatisticsResponse,
-    GlobalExplanationResponse,
-    ExplanationStatisticsResponse,
-    GenerateExplanationRequest
-)
 from app.explainability.cache import get_explanation_cache
 from app.explainability.manager import ExplanationManager
+from app.explainability.schemas import (
+    CacheStatisticsResponse,
+    ExplanationResponse,
+    ExplanationStatisticsResponse,
+    GenerateExplanationRequest,
+    GlobalExplanationResponse,
+)
+from app.storage.database import get_db
+from app.storage.models import ExplanationMetadata, GlobalExplanationSummary
 
 router = APIRouter(prefix="/explanations", tags=["explainability"])
 

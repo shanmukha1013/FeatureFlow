@@ -7,7 +7,8 @@ If Redis is down or unreachable, CacheManager returns None or False so that repo
 and inference engines automatically retrieve fresh data directly from PostgreSQL.
 """
 import json
-from typing import Optional, Dict, Any, Union, List
+from typing import Any, Dict, List, Optional, Union
+
 import redis.asyncio as aioredis
 
 from app.cache.redis_client import RedisClient, get_redis_client
@@ -32,7 +33,10 @@ class CacheManager:
             return await client.get(key)
 
         res = await self.redis.execute_with_retry(_op)
-        from app.observability.instrumentation import record_cache_hit, record_cache_miss
+        from app.observability.instrumentation import (
+            record_cache_hit,
+            record_cache_miss,
+        )
         if res is not None:
             record_cache_hit("general")
             return str(res)
@@ -77,7 +81,10 @@ class CacheManager:
             return await client.get(key)
 
         res = await self.redis.execute_with_retry(_op)
-        from app.observability.instrumentation import record_cache_hit, record_cache_miss
+        from app.observability.instrumentation import (
+            record_cache_hit,
+            record_cache_miss,
+        )
         if res is not None:
             record_cache_hit("json")
             try:

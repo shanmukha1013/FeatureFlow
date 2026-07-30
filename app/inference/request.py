@@ -1,10 +1,10 @@
 """
 Defines the immutable prediction request contract.
 """
-from dataclasses import dataclass, field
-from typing import Dict, Any
-from datetime import datetime, timezone
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Dict
 
 
 @dataclass(frozen=True)

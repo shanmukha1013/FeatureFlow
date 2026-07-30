@@ -4,9 +4,9 @@ Manages the lifecycle of heavy ML registries and predictors.
 """
 
 from app.inference.engine import PredictionEngine
-from app.training.artifacts import LocalArtifactStore
-from app.inference.validator import RequestValidator
 from app.inference.predictor import ModelPredictor
+from app.inference.validator import RequestValidator
+from app.training.artifacts import LocalArtifactStore
 
 # ---------------------------------------------------------
 # SINGLETONS

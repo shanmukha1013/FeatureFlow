@@ -1,7 +1,9 @@
-from typing import Generic, TypeVar, Type, Optional, List, Dict, Any
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
+
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete, update
+
 from app.storage.database import Base
 
 ModelType = TypeVar("ModelType", bound=Base)

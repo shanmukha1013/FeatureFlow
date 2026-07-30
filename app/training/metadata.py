@@ -6,8 +6,8 @@ hyperparameters, features, and evaluation metrics tied to every trained artifact
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class ModelLifecycleState(str, Enum):

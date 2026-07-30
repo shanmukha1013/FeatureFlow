@@ -1,10 +1,12 @@
+import asyncio
+
 import numpy as np
 import pandas as pd
-from app.training.trainer import RandomForestTrainer
-from app.serving.dependencies import get_prediction_engine
-import asyncio
-import pytest_asyncio
 import pytest
+import pytest_asyncio
+
+from app.serving.dependencies import get_prediction_engine
+from app.training.trainer import RandomForestTrainer
 
 pytestmark = pytest.mark.integration
 
@@ -33,8 +35,9 @@ async def setup_prediction_engine():
             self.features_meta = []
 
         def predict(self, req):
-            from app.inference.response import PredictionResponse
             import datetime
+
+            from app.inference.response import PredictionResponse
             return PredictionResponse(
                 request_id=req.request_id,
                 model_name=self.model_id,
@@ -64,10 +67,12 @@ async def setup_prediction_engine():
 @pytest_asyncio.fixture(autouse=True)
 async def seed_default_model(setup_database):
     """Ensure the 'default' model exists in the database for foreign key constraints."""
-    from app.storage.database import AsyncSessionLocal
-    from app.storage.models import Model, Dataset
-    from sqlalchemy.future import select
     import datetime
+
+    from sqlalchemy.future import select
+
+    from app.storage.database import AsyncSessionLocal
+    from app.storage.models import Dataset, Model
 
     async with AsyncSessionLocal() as session:
         # Clean up any default datasets (which will cascade delete models)

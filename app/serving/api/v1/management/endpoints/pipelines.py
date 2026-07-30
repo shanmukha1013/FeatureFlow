@@ -1,13 +1,15 @@
 """
 Exposes pipeline execution reports.
 """
-from fastapi import APIRouter, Query, Depends
 from typing import Any
-from app.serving.api.v1.management.schemas.pagination import PaginatedResponse
-from app.storage.database import get_db
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import desc
+
+from app.serving.api.v1.management.schemas.pagination import PaginatedResponse
+from app.storage.database import get_db
 
 router = APIRouter()
 

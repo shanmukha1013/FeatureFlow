@@ -7,11 +7,11 @@ Emits audit events when configured alert thresholds are exceeded.
 """
 import asyncio
 import time
-from typing import Dict, Any, Optional
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-from app.utils.logger import get_logger
 from app.config import settings
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -222,8 +222,8 @@ class RedisHealthMonitor:
 
     async def _check_alerts(self, snapshot: Dict[str, Any]) -> None:
         """Emits audit events when thresholds are exceeded."""
+        from app.monitoring.audit import AuditEvent, AuditLogger
         from app.storage.database import AsyncSessionLocal
-        from app.monitoring.audit import AuditLogger, AuditEvent
 
         alerts = []
 

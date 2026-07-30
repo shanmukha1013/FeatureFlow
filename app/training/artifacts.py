@@ -1,9 +1,9 @@
 """
 Persists trained model binaries to the filesystem.
 """
-import os
 import hashlib
-from typing import Any, Tuple, Optional
+import os
+from typing import Any, Optional, Tuple
 
 from app.training.exceptions import ArtifactError
 from app.utils.logger import get_logger

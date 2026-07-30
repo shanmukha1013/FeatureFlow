@@ -2,8 +2,9 @@
 Pydantic contracts for incoming API requests.
 Isolates API payload validation from internal domain models.
 """
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
 
 
 class PredictRequestSchema(BaseModel):

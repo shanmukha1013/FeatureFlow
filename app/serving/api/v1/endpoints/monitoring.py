@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse
 from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.storage.database import get_db
-from app.monitoring.schemas import MonitoringRunRequest, MonitoringReportResponse
+
+from app.monitoring.schemas import MonitoringReportResponse, MonitoringRunRequest
 from app.monitoring.service import MonitoringService
+from app.storage.database import get_db
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 

@@ -1,12 +1,12 @@
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from app.utils.logger import get_logger
+from app.explainability.cache import get_explanation_cache
+from app.explainability.explainer import ExplainerEngine
+from app.monitoring.audit import AuditEvent, AuditLogger
 from app.storage.database import AsyncSessionLocal
 from app.storage.models import ExplanationMetadata
-from app.explainability.explainer import ExplainerEngine
-from app.explainability.cache import get_explanation_cache
-from app.monitoring.audit import AuditLogger, AuditEvent
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -128,10 +128,11 @@ class ExplanationManager:
         expectation_suite_version = None
 
         try:
-            from app.storage.models import Model
-            from app.data_quality.models import ValidationRun
-            from sqlalchemy.future import select
             from sqlalchemy import desc
+            from sqlalchemy.future import select
+
+            from app.data_quality.models import ValidationRun
+            from app.storage.models import Model
 
             async with AsyncSessionLocal() as session:
                 # Get dataset ID

@@ -4,11 +4,11 @@ Executes generic, structural cleaning on validated datasets.
 Standardizes structures across datasets (e.g., lowercase columns, trimming
 strings, deduplication) without delving into semantic feature engineering.
 """
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-from app.utils.logger import get_logger
 from app.data.exceptions import DataPreprocessingError
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

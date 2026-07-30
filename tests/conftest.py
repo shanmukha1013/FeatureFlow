@@ -19,12 +19,12 @@ SAFETY GUARD:
 """
 import os
 import sys
-import pytest
-import pytest_asyncio
 from typing import AsyncGenerator
 
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from httpx import AsyncClient, ASGITransport
 
 from app.config import settings
 from app.storage.database import AsyncSessionLocal, init_db
@@ -120,9 +120,10 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture()
 async def client() -> AsyncGenerator[AsyncClient, None]:
     """Provide an async HTTP test client for FastAPI integration tests, authenticated as Admin."""
-    from app.storage.models import User
     from sqlalchemy.future import select
+
     from app.security.auth import create_access_token
+    from app.storage.models import User
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(User).filter_by(username="admin"))

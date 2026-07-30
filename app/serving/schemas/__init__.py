@@ -1,14 +1,14 @@
 """
 Exposes Pydantic schemas for the Serving Layer.
 """
+from .error import ErrorDetail, ErrorResponseSchema
 from .request import PredictRequestSchema
 from .response import (
-    PredictResponseSchema,
     HealthResponseSchema,
     ModelsResponseSchema,
-    VersionResponseSchema
+    PredictResponseSchema,
+    VersionResponseSchema,
 )
-from .error import ErrorResponseSchema, ErrorDetail
 
 __all__ = [
     "PredictRequestSchema",

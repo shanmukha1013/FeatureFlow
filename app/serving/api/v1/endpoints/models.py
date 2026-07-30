@@ -3,8 +3,9 @@ Implements the model discovery endpoint.
 Returns the active model routing table from the prediction engine.
 """
 from fastapi import APIRouter, Depends
-from app.serving.schemas.response import ModelsResponseSchema, ModelAliasSchema
+
 from app.serving.dependencies import get_prediction_engine
+from app.serving.schemas.response import ModelAliasSchema, ModelsResponseSchema
 
 router = APIRouter()
 

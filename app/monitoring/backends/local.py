@@ -8,7 +8,7 @@ These are NOT used in production — PostgreSQL is the audit backend.
 import json
 from typing import Any, Dict
 
-from app.monitoring.backends.base import BaseMetricBackend, BaseAuditBackend
+from app.monitoring.backends.base import BaseAuditBackend, BaseMetricBackend
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)

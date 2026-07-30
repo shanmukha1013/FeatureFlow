@@ -1,22 +1,24 @@
-import os
-import glob
-import pandas as pd
-import hashlib
-import time
 import asyncio
+import glob
+import hashlib
+import os
+import time
 from typing import List
 
+import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.storage.database import AsyncSessionLocal
+
 from app.config import settings
-from app.utils.logger import get_logger
-from app.monitoring.audit import AuditLogger, AuditEvent
 from app.data.loader import CSVDataLoader
-from app.data.validator import DataValidator
 from app.data.profiler import DataProfiler
-from app.data.schema import global_schema_registry as schema_registry, DatasetSchema, ColumnSchema
-from app.storage.repositories.core import DatasetRepository
+from app.data.schema import ColumnSchema, DatasetSchema
+from app.data.schema import global_schema_registry as schema_registry
+from app.data.validator import DataValidator
+from app.monitoring.audit import AuditEvent, AuditLogger
+from app.storage.database import AsyncSessionLocal
 from app.storage.models import Dataset
+from app.storage.repositories.core import DatasetRepository
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -164,7 +166,7 @@ class DatasetDiscovery:
 
                     # Auto-register schema if missing
                     if not schema_registry.has_schema(dataset_name):
-                        from app.data.schema import DatasetSchema, ColumnSchema
+                        from app.data.schema import ColumnSchema, DatasetSchema
                         columns = []
                         for col, dtype in sample_df.dtypes.items():
                             col_type = "int64" if "int" in str(dtype) else "float64" if "float" in str(dtype) else "object"

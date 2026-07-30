@@ -3,7 +3,12 @@ Maps internal domain exceptions to safe HTTP responses.
 """
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from app.inference.exceptions import InputValidationError, ModelLoadError, InferenceError
+
+from app.inference.exceptions import (
+    InferenceError,
+    InputValidationError,
+    ModelLoadError,
+)
 
 
 async def validation_error_handler(request: Request, exc: InputValidationError):

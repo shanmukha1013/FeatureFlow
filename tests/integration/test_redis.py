@@ -1,9 +1,11 @@
+import asyncio
+
+import pytest
+import pytest_asyncio
+from httpx import AsyncClient
+
 from app.cache.cache_manager import CacheManager
 from app.cache.redis_client import RedisClient, sanitize_redis_url
-from httpx import AsyncClient
-import pytest_asyncio
-import asyncio
-import pytest
 
 pytestmark = pytest.mark.integration
 

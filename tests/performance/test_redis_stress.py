@@ -1,13 +1,15 @@
+import asyncio
+import time
+import uuid
+from typing import Tuple
+
+import pytest
+import pytest_asyncio
+
 from app.cache.model_cache import ModelRegistryCache
 from app.cache.online_store import OnlineFeatureStore
-from app.cache.prediction_cache import get_prediction_cache, PredictionCache
+from app.cache.prediction_cache import PredictionCache, get_prediction_cache
 from app.cache.redis_client import RedisClient
-from typing import Tuple
-import pytest_asyncio
-import uuid
-import time
-import asyncio
-import pytest
 
 pytestmark = pytest.mark.performance
 

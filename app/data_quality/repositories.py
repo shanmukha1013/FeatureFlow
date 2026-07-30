@@ -1,9 +1,15 @@
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import desc
 
-from app.data_quality.models import DataContractModel, ExpectationSuiteModel, ValidationRun, ExpectationResult
+from app.data_quality.models import (
+    DataContractModel,
+    ExpectationResult,
+    ExpectationSuiteModel,
+    ValidationRun,
+)
 
 
 class DataContractRepository:

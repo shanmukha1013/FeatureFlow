@@ -1,22 +1,30 @@
 """
 Dataset Upload and Management API.
 """
-import os
-import io
-import uuid
 import hashlib
-import pandas as pd
+import io
+import os
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
+import pandas as pd
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+)
+from sqlalchemy import desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import desc
 
+from app.monitoring.audit import AuditEvent, AuditLogger
 from app.storage.database import get_db
 from app.storage.models import Dataset, DatasetVersion, Feature
-from app.monitoring.audit import AuditLogger, AuditEvent
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -65,14 +73,16 @@ def _compute_profile(df: pd.DataFrame) -> dict:
 
 async def _auto_train_background(dataset_id: str, dataset_name: str, file_path: str):
     """Trigger the training orchestrator as a background task."""
+    import asyncio
+
     from app.storage.database import AsyncSessionLocal
     from app.training.orchestrator import TrainingOrchestrator
-    import asyncio
     # Small delay to ensure DB commit is fully visible
     await asyncio.sleep(0.5)
     async with AsyncSessionLocal() as session:
         try:
             from sqlalchemy.future import select as sa_select
+
             from app.storage.models import Dataset as DatasetModel
             result = await session.execute(sa_select(DatasetModel).filter(DatasetModel.id == dataset_id))
             dataset_record = result.scalars().first()
@@ -138,7 +148,7 @@ async def upload_dataset(
         if col in df.columns:
             entity_key_col = col
             break
-            
+
     if not entity_key_col:
         entity_key_col = "_entity_id"
         df["_entity_id"] = [str(uuid.uuid4()) for _ in range(len(df))]
@@ -200,11 +210,11 @@ async def upload_dataset(
     await session.flush()
 
     await session.commit()
-    
+
     # Fire EventBus Event for Lifecycle Orchestrator
     try:
         from app.events import get_event_bus
-        from app.events.schema import Event, EventType, EventSeverity
+        from app.events.schema import Event, EventSeverity, EventType
         bus = get_event_bus()
         if bus:
             await bus.publish(Event(

@@ -1,9 +1,11 @@
 """
 Serving Layer integration for observability.
 """
-import uuid
 import time
+import uuid
+
 from fastapi import Request
+
 from app.monitoring.logger import correlation_id_var
 from app.utils.logger import get_logger
 

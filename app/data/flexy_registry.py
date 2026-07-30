@@ -5,7 +5,7 @@ Defines the explicit domain models and storage configurations for the 13 officia
 marketplace tables. Ensures the Data Layer strictly validates all ingested files
 against these deterministic contracts.
 """
-from app.data.schema import DatasetSchema, ColumnSchema, SchemaRegistry
+from app.data.schema import ColumnSchema, DatasetSchema, SchemaRegistry
 
 
 def register_flexy_schemas(registry: SchemaRegistry) -> None:

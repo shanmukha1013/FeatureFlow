@@ -1,9 +1,9 @@
-import logging
-from typing import Callable, Awaitable, List
 import asyncio
-from app.events.schema import Event
-from app.cache.redis_client import RedisClient
+import logging
+from typing import Awaitable, Callable, List
 
+from app.cache.redis_client import RedisClient
+from app.events.schema import Event
 
 logger = logging.getLogger(__name__)
 

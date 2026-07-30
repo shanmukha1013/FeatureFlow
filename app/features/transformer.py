@@ -2,14 +2,15 @@
 Executes stateful feature computation workflows.
 """
 import time
-import pandas as pd
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from app.features.exceptions import FeatureTransformationError
-from app.utils.logger import get_logger
-from app.storage.models import Feature
+import pandas as pd
+
 from app.features.engine import FEATURE_MAPPINGS
+from app.features.exceptions import FeatureTransformationError
 from app.features.metadata import FeatureMetadata
+from app.storage.models import Feature
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -29,7 +30,7 @@ class FeatureTransformer:
     def _build_metadata(self, df_or_dict, feature_record: Feature) -> FeatureMetadata:
         """Helper to construct strictly typed FeatureMetadata from DB records."""
         name = feature_record.name
-        
+
         # Heuristic to find the original column name if not explicitly stored
         col_name = None
         col_name = None
@@ -90,12 +91,12 @@ class FeatureTransformer:
             try:
                 meta = self._build_metadata(df, feature_record)
                 feature_class = self.class_map.get(feature_record.transformation)
-                
+
                 if not feature_class:
                     raise FeatureTransformationError(f"Unknown transformation: {feature_record.transformation}")
 
                 feature_instance = feature_class(metadata=meta)
-                
+
                 # Compute state
                 state_dict = feature_instance.fit(df)
                 feature_record.state = state_dict

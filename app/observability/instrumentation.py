@@ -1,14 +1,24 @@
 import asyncio
+
 import psutil
 
 from app.observability.metrics import (
-    prediction_requests_total, prediction_latency_seconds, prediction_failures_total,
-    training_runs_total, training_duration_seconds, training_failures_total,
-    mlflow_experiments_created_total, mlflow_models_registered_total, mlflow_models_promoted_total,
-    drift_checks_total, drift_detected_total,
-    cache_hits_total, cache_misses_total,
+    cache_hits_total,
+    cache_misses_total,
     datasets_registered_total,
-    process_cpu_percent, process_memory_bytes
+    drift_checks_total,
+    drift_detected_total,
+    mlflow_experiments_created_total,
+    mlflow_models_promoted_total,
+    mlflow_models_registered_total,
+    prediction_failures_total,
+    prediction_latency_seconds,
+    prediction_requests_total,
+    process_cpu_percent,
+    process_memory_bytes,
+    training_duration_seconds,
+    training_failures_total,
+    training_runs_total,
 )
 
 

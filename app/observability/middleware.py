@@ -1,11 +1,12 @@
 import time
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.observability.metrics import (
-    http_requests_total,
     http_request_duration_seconds,
-    http_requests_active
+    http_requests_active,
+    http_requests_total,
 )
 
 

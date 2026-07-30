@@ -4,11 +4,13 @@ Centralizes configuration management for FeatureFlow.
 Provides a strict, immutable contract for application settings.
 Loaded once per execution context to avoid hardcoded paths and values.
 """
-from app.utils.logger import get_logger
 import os
 import sys
 from dataclasses import dataclass
+
 from dotenv import load_dotenv
+
+from app.utils.logger import get_logger
 
 load_dotenv()
 

@@ -4,13 +4,14 @@ Generates statistical profiles for raw datasets.
 Extracts deep diagnostic metrics (cardinality, null rates, numeric distributions)
 without mutating the underlying data structure.
 """
-import pandas as pd
-from typing import Dict
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Dict
 
-from app.utils.logger import get_logger
+import pandas as pd
+
 from app.data.exceptions import DataProfilingError
+from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -1,10 +1,10 @@
 """
 Public boundary for the Monitoring & Observability Layer.
 """
+from .audit import AuditEvent, AuditLogger
 from .config import monitoring_config
-from .audit import AuditLogger, AuditEvent
-from .logger import setup_structured_logging, correlation_id_var
-from .health import HealthStatus, HealthMonitor
+from .health import HealthMonitor, HealthStatus
+from .logger import correlation_id_var, setup_structured_logging
 from .middleware import monitoring_middleware
 
 __all__ = [

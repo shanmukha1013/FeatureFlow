@@ -1,8 +1,9 @@
 """
 Evaluates trained artifacts against held-out test datasets.
 """
-import pandas as pd
 from typing import Any, Dict
+
+import pandas as pd
 
 from app.training.base import BaseEvaluator
 from app.training.exceptions import EvaluationError
@@ -19,7 +20,14 @@ class ClassificationEvaluator(BaseEvaluator):
     def evaluate(self, model: Any, X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str, Any]:
         logger.info("Executing evaluation sequence on test partition.")
         try:
-            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, classification_report
+            from sklearn.metrics import (
+                accuracy_score,
+                classification_report,
+                f1_score,
+                precision_score,
+                recall_score,
+                roc_auc_score,
+            )
 
             predictions = model.predict(X_test)
             metrics: Dict[str, Any] = {

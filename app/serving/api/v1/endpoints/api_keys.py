@@ -1,14 +1,15 @@
+import datetime as dt
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from datetime import datetime, timezone
-import datetime as dt
 
+from app.monitoring.audit import AuditEvent, AuditLogger
+from app.security.auth import generate_api_key
+from app.security.schemas import ApiKeyCreate, ApiKeyMetaResponse, ApiKeyResponse
 from app.storage.database import get_db
 from app.storage.models import ApiKey
-from app.security.auth import generate_api_key
-from app.security.schemas import ApiKeyCreate, ApiKeyResponse, ApiKeyMetaResponse
-from app.monitoring.audit import AuditLogger, AuditEvent
 
 router = APIRouter(prefix="/api-keys", tags=["api_keys"])
 

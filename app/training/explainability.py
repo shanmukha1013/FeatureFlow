@@ -1,5 +1,7 @@
+from typing import Any, Dict, Optional
+
 import pandas as pd
-from typing import Dict, Any, Optional
+
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -35,8 +37,8 @@ class GlobalExplainer:
     def compute_shap_summary(self, model: Any, X_train: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """Computes a lightweight SHAP summary payload for dashboard visualization."""
         try:
-            import shap
             import numpy as np
+            import shap
 
             # Sample background data to prevent memory exhaustion
             background = shap.sample(X_train, 100) if len(X_train) > 100 else X_train

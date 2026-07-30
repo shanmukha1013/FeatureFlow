@@ -1,12 +1,18 @@
-from app.storage.repositories.core import DatasetRepository, FeatureRepository, FeatureValueRepository
-from app.storage.database import AsyncSessionLocal
+import asyncio
+import uuid
+
+import pytest
+import pytest_asyncio
+from httpx import AsyncClient
+
 from app.cache.online_store import OnlineFeatureStore
 from app.cache.redis_client import RedisClient
-from httpx import AsyncClient
-import pytest_asyncio
-import uuid
-import asyncio
-import pytest
+from app.storage.database import AsyncSessionLocal
+from app.storage.repositories.core import (
+    DatasetRepository,
+    FeatureRepository,
+    FeatureValueRepository,
+)
 
 pytestmark = pytest.mark.integration
 

@@ -1,15 +1,17 @@
 """
 Implements the Prediction Cache API endpoints (`Phase 4`).
 """
-from fastapi import APIRouter, status, HTTPException, Query
 from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query, status
+
+from app.cache.prediction_cache import get_prediction_cache
 from app.serving.schemas.prediction_cache import (
+    PredictionCacheDeleteResponseSchema,
     PredictionCacheGetResponseSchema,
     PredictionCacheRefreshResponseSchema,
-    PredictionCacheDeleteResponseSchema,
-    PredictionCacheStatsSchema
+    PredictionCacheStatsSchema,
 )
-from app.cache.prediction_cache import get_prediction_cache
 
 router = APIRouter()
 

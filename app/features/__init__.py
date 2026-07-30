@@ -7,14 +7,14 @@ Aggregates and exports abstractions so external modules (like future pipelines)
 can interact cleanly with the Feature Layer without deep imports.
 """
 from .exceptions import (
+    DuplicateFeatureError,
     FeatureError,
     FeatureNotFoundError,
-    DuplicateFeatureError,
-    InvalidFeatureError,
     FeatureTransformationError,
+    InvalidFeatureError,
 )
-from .metadata import FeatureMetadata
 from .feature import BaseFeature
+from .metadata import FeatureMetadata
 from .transformer import FeatureTransformer
 
 __all__ = [

@@ -1,22 +1,27 @@
 """
 Provides high-level platform and system overview data.
 """
-import sys
 import platform
+import sys
+from datetime import datetime, timezone
+
 import fastapi
 from fastapi import APIRouter, Depends
-from datetime import datetime, timezone
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
 
-from app.storage.database import get_db
-from app.storage.models import Dataset, Feature, Model, Experiment
-from app.serving.api.v1.management.schemas.responses import (
-    PlatformOverviewSchema, SystemInfoSchema, StatisticsSchema, AboutSchema, ConfigSchema
-)
 from app.monitoring.health import HealthMonitor
+from app.serving.api.v1.management.schemas.responses import (
+    AboutSchema,
+    ConfigSchema,
+    PlatformOverviewSchema,
+    StatisticsSchema,
+    SystemInfoSchema,
+)
 from app.serving.config import serving_config
+from app.storage.database import get_db
+from app.storage.models import Dataset, Experiment, Feature, Model
 
 router = APIRouter()
 

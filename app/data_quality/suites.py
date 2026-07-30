@@ -1,12 +1,12 @@
 from typing import Tuple
+
+from great_expectations.core.expectation_configuration import ExpectationConfiguration
+from great_expectations.core.expectation_suite import ExpectationSuite
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from great_expectations.core.expectation_suite import ExpectationSuite
-from great_expectations.core.expectation_configuration import ExpectationConfiguration
-
-from app.data_quality.models import ExpectationSuiteModel, DataContractModel
-from app.data_quality.repositories import ExpectationSuiteRepository
 from app.data_quality.expectations import generate_base_expectations
+from app.data_quality.models import DataContractModel, ExpectationSuiteModel
+from app.data_quality.repositories import ExpectationSuiteRepository
 
 
 class ExpectationSuiteEngine:

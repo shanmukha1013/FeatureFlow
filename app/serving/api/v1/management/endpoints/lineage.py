@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Any, Dict
+
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from typing import List, Dict, Any
+
 from app.storage.database import get_db
-from app.storage.models import Dataset, Feature, Model, ChampionModel, InferenceRequest
+from app.storage.models import ChampionModel, Dataset, Feature, InferenceRequest, Model
 
 router = APIRouter()
+
 
 @router.get("/groups", response_model=Dict[str, Any])
 async def get_lineage_groups(session: AsyncSession = Depends(get_db)):
@@ -46,13 +49,13 @@ async def get_lineage_groups(session: AsyncSession = Depends(get_db)):
         # 2. Fetch Features for this Dataset (Grouped)
         features_res = await session.execute(select(Feature).filter(Feature.dataset_id == ds.id))
         features = features_res.scalars().all()
-        
+
         if features:
             fg_id = f"fg_{ds.id}"
             fg_recommendations = []
             if len(features) < 3:
                 fg_recommendations.append("Low feature count. Consider automated temporal aggregations.")
-            
+
             nodes.append({
                 "id": fg_id,
                 "type": "feature_group",
@@ -71,12 +74,12 @@ async def get_lineage_groups(session: AsyncSession = Depends(get_db)):
 
         for model in models:
             m_id = f"model_{model.id}"
-            
+
             # Check for Drift (Simulated Intelligence)
             m_recommendations = []
             if model.status == "REGISTERED":
                 m_recommendations.append("Model registered. Ready for deployment review.")
-                
+
             nodes.append({
                 "id": m_id,
                 "type": "model",
@@ -98,14 +101,14 @@ async def get_lineage_groups(session: AsyncSession = Depends(get_db)):
             champion = champions_res.scalars().first()
             if champion:
                 ep_id = f"ep_{champion.id}"
-                
+
                 # Inference load intelligence
                 inf_res = await session.execute(select(InferenceRequest).limit(10))
                 inf_count = len(inf_res.scalars().all())
                 ep_recs = []
                 if inf_count > 0:
-                    ep_recs.append(f"Processing live traffic. Drift monitoring active.")
-                
+                    ep_recs.append("Processing live traffic. Drift monitoring active.")
+
                 nodes.append({
                     "id": ep_id,
                     "type": "endpoint",
