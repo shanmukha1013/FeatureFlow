@@ -52,6 +52,10 @@ from app.observability.instrumentation import collect_system_metrics
 from contextlib import asynccontextmanager
 import asyncio
 
+from app.utils.logger import get_logger
+from app.config import settings
+
+logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,66 +71,49 @@ async def lifespan(app: FastAPI):
     # Initialize Database connection and create tables
     await init_db()
 
-    # Initialize Redis Cloud connection pool
-    redis_client = await RedisClient.get_instance()
-
-    # Phase 13A: Startup Validation
-    async def validate_startup():
-        import sys
-        import os
-        import mlflow
-        from app.config import settings
-
-        try:
-            # 1. Environment variables (No longer requires JWT)
-
-            # 2. PostgreSQL
-            try:
-                async with AsyncSessionLocal() as session:
-                    from sqlalchemy import text
-                    await session.execute(text("SELECT 1"))
-            except Exception as e:
-                print(f"CRITICAL: Failed to connect to PostgreSQL: {e}", file=sys.stderr)
-                sys.exit(1)
-
-            # 3. Redis
-            if not redis_client.is_connected:
-                print("CRITICAL: Failed to connect to Redis.", file=sys.stderr)
-                sys.exit(1)
-
-            # 4. MLflow
-            try:
-                mlflow.get_tracking_uri()
-            except Exception as e:
-                print(f"CRITICAL: MLflow configuration invalid: {e}", file=sys.stderr)
-                sys.exit(1)
-
-            # 5. Required directories & writable storage
-            required_dirs = [settings.data_dir, "models", "reports"]
-            for d in required_dirs:
-                os.makedirs(d, exist_ok=True)
-                if not os.access(d, os.W_OK):
-                    print(f"CRITICAL: Directory {d} is not writable.", file=sys.stderr)
-                    sys.exit(1)
-
-        except SystemExit:
-            raise
-        except Exception as e:
-            if settings.environment != "development":
-                print(f"CRITICAL: Startup validation failed: {e}", file=sys.stderr)
-                sys.exit(1)
-            else:
-                raise e
-
-    await validate_startup()
-
     # Phase 5: Initialize Redis Subsystem (optional – degrades gracefully if unavailable)
-    # In V3, Redis also powers our core EventBus.
-    # REDIS_URL must be set in the environment.  On Render, set it to your
-    # Redis Cloud / Upstash URL.  In docker-compose, set REDIS_URL=redis://redis:6379/0
+    # REDIS_URL must be set in the environment. On Render, set it to your Redis Cloud /
+    # Upstash URL. In docker-compose, set REDIS_URL=redis://redis:6379/0
     redis_client = RedisClient()
     connected = await redis_client.connect()
     app.state.redis = redis_client
+
+    # Phase 13A: Startup Validation
+    async def validate_startup():
+        import os
+        import mlflow
+
+        # 1. PostgreSQL — mandatory, app cannot function without it
+        try:
+            async with AsyncSessionLocal() as session:
+                from sqlalchemy import text
+                await session.execute(text("SELECT 1"))
+            logger.info("PostgreSQL connection verified.")
+        except Exception as e:
+            logger.critical("Failed to connect to PostgreSQL: %s — aborting startup.", e)
+            raise RuntimeError(f"PostgreSQL unavailable: {e}") from e
+
+        # 2. Redis — optional, app degrades gracefully without it
+        if not redis_client.is_connected:
+            logger.warning(
+                "Redis is not connected at startup validation. "
+                "The application will run in degraded mode (no cache / event bus)."
+            )
+
+        # 3. MLflow — non-fatal, tracking URI may not be set
+        try:
+            mlflow.get_tracking_uri()
+        except Exception as e:
+            logger.warning("MLflow configuration check failed (non-fatal): %s", e)
+
+        # 4. Required directories & writable storage
+        required_dirs = [settings.data_dir, "models", "reports"]
+        for d in required_dirs:
+            os.makedirs(d, exist_ok=True)
+            if not os.access(d, os.W_OK):
+                logger.warning("Directory %s is not writable — some features may fail.", d)
+
+    await validate_startup()
 
     if connected:
         # Initialize EventBus only when Redis is actually reachable
